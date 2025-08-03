@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Analysis API - File Upload Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+
+        input[type="file"],
+        input[type="text"],
+        textarea,
+        select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        textarea {
+            height: 100px;
+            resize: vertical;
+        }
+
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 4px;
+            display: none;
+        }
+
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+
+        .loading {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+
+        .example {
+            background-color: #f8f9fa;
+            border-left: 4px solid #007bff;
+            padding: 15px;
+            margin: 20px 0;
+        }
+
+        .example h3 {
+            margin-top: 0;
+            color: #007bff;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Data Analysis API - File Upload Test</h1>
+
+        <div class="example">
+            <h3>Example Usage</h3>
+            <p>This interface matches the API requirement to accept file uploads, such as:</p>
+            <code>curl "https://app.example.com/api/" -F "file=@question.txt"</code>
+        </div>
+
+        <form id="uploadForm">
+            <div class="form-group">
+                <label for="file">Upload File (Optional)</label>
+                <input type="file" id="file" name="file" accept=".txt,.csv,.json">
+                <small>Supported formats: .txt, .csv, .json</small>
+            </div>
+
+            <div class="form-group">
+                <label for="task_description">Task Description (Optional if file provided)</label>
+                <textarea id="task_description" name="task_description"
+                    placeholder="Describe your analysis task..."></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="workflow_type">Workflow Type</label>
+                <select id="workflow_type" name="workflow_type">
+                    <option value="data_analysis">Data Analysis</option>
+                    <option value="exploratory_data_analysis">Exploratory Data Analysis</option>
+                    <option value="predictive_modeling">Predictive Modeling</option>
+                    <option value="data_visualization">Data Visualization</option>
+                    <option value="code_generation">Code Generation</option>
+                    <option value="report_generation">Report Generation</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="business_context">Business Context (Optional)</label>
+                <textarea id="business_context" name="business_context"
+                    placeholder="Additional context about your business or use case..."></textarea>
+            </div>
+
+            <button type="submit">Submit Analysis Request</button>
+        </form>
+
+        <div id="result" class="result"></div>
+
+        <div class="example">
+            <h3>Testing with curl</h3>
+            <p>You can also test the API directly with curl:</p>
+            <pre><code># File upload
+curl "http://localhost:8000/api/" -F "file=@question.txt"
+
+# Form data
+curl "http://localhost:8000/api/" -F "task_description=Analyze sales data"
+
+# Check status
+curl "http://localhost:8000/api/tasks/{task_id}/status"</code></pre>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const resultDiv = document.getElementById('result');
+            const formData = new FormData();
+
+            // Add form fields to FormData
+            const file = document.getElementById('file').files[0];
+            const taskDescription = document.getElementById('task_description').value;
+            const workflowType = document.getElementById('workflow_type').value;
+            const businessContext = document.getElementById('business_context').value;
+
+            if (file) {
+                formData.append('file', file);
+            }
+            if (taskDescription) {
+                formData.append('task_description', taskDescription);
+            }
+            if (workflowType) {
+                formData.append('workflow_type', workflowType);
+            }
+            if (businessContext) {
+                formData.append('business_context', businessContext);
+            }
+
+            // Validate input
+            if (!file && !taskDescription) {
+                showResult('error', 'Please provide either a file or task description.');
+                return;
+            }
+
+            // Show loading
+            showResult('loading', 'Submitting request...');
+
+            try {
+                const response = await fetch('http://localhost:8000/api/', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showResult('success', `
+                        <strong>Success!</strong><br>
+                        Task ID: ${data.task_id}<br>
+                        Status: ${data.status}<br>
+                        <br>
+                        <button onclick="checkStatus('${data.task_id}')">Check Status</button>
+                    `);
+                } else {
+                    showResult('error', `Error: ${data.detail || 'Unknown error'}`);
+                }
+            } catch (error) {
+                showResult('error', `Network error: ${error.message}`);
+            }
+        });
+
+        function showResult(type, message) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.className = `result ${type}`;
+            resultDiv.innerHTML = message;
+            resultDiv.style.display = 'block';
+        }
+
+        async function checkStatus(taskId) {
+            showResult('loading', 'Checking status...');
+
+            try {
+                const response = await fetch(`http://localhost:8000/api/tasks/${taskId}/status`);
+                const data = await response.json();
+
+                if (response.ok) {
+                    let resultHtml = `
+                        <strong>Task Status: ${data.status}</strong><br>
+                        Created: ${data.created_at}<br>
+                    `;
+
+                    if (data.status === 'completed' && data.result) {
+                        resultHtml += `
+                            <br><strong>Analysis Results:</strong><br>
+                            Summary: ${data.result.summary}<br>
+                            <br><strong>Insights:</strong><br>
+                            ${data.result.insights.map(insight => `• ${insight}`).join('<br>')}
+                            <br><br><strong>Recommendations:</strong><br>
+                            ${data.result.recommendations.map(rec => `• ${rec}`).join('<br>')}
+                        `;
+
+                        if (data.result.file_analysis) {
+                            resultHtml += `
+                                <br><br><strong>File Analysis:</strong><br>
+                                File: ${data.result.file_analysis.file_name}<br>
+                                Size: ${data.result.file_analysis.content_length} characters<br>
+                                Preview: ${data.result.file_analysis.content_preview}
+                            `;
+                        }
+                    } else if (data.status === 'processing') {
+                        resultHtml += `<br><button onclick="checkStatus('${taskId}')">Refresh Status</button>`;
+                    }
+
+                    showResult('success', resultHtml);
+                } else {
+                    showResult('error', `Error: ${data.detail || 'Unknown error'}`);
+                }
+            } catch (error) {
+                showResult('error', `Network error: ${error.message}`);
+            }
+        }
+    </script>
+</body>
+
+</html>

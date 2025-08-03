@@ -1,0 +1,13 @@
+Analyze customer churn patterns in our e-commerce platform.
+
+Key questions to address:
+1. What are the main factors contributing to customer churn?
+2. Which customer segments have the highest churn rates?
+3. What is the average time between customer acquisition and churn?
+4. Are there seasonal patterns in customer churn?
+5. What interventions could reduce churn rates?
+
+Additional context:
+- We have data from the past 2 years
+- Customer base includes both B2B and B2C segments
+- Primary metrics to focus on: retention rate, lifetime value, churn rate
