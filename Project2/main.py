@@ -32,9 +32,27 @@ try:
     from workflows import AdvancedWorkflowOrchestrator
     orchestrator = AdvancedWorkflowOrchestrator()
     logger.info("Successfully initialized AdvancedWorkflowOrchestrator")
-except ImportError as e:
-    logger.warning(f"Could not import workflows: {e}")
-    orchestrator = None
+    logger.info(f"Available workflows: {list(orchestrator.workflows.keys())}")
+except Exception as e:
+    logger.error(f"Could not import or initialize workflows: {e}")
+    # Try to create a minimal orchestrator with just the fallback workflow
+    try:
+        from workflows import ModularWebScrapingWorkflow
+        from chains.base import WorkflowOrchestrator
+        
+        class MinimalOrchestrator(WorkflowOrchestrator):
+            def __init__(self):
+                super().__init__()
+                self.llm = None
+                self.workflows = {
+                    "multi_step_web_scraping": ModularWebScrapingWorkflow()
+                }
+        
+        orchestrator = MinimalOrchestrator()
+        logger.info("Created minimal orchestrator with fallback workflows")
+    except Exception as e2:
+        logger.error(f"Could not create minimal orchestrator: {e2}")
+        orchestrator = None
 
 app = FastAPI(
     title="Data Analysis API",
@@ -553,13 +571,13 @@ async def execute_workflow_sync(workflow_type: str, workflow_input: Dict[str, An
     """Execute workflow synchronously with enhanced error handling"""
     try:
         if orchestrator is None:
-            logger.warning("LangChain orchestrator not available, using fallback")
+            logger.warning("No orchestrator available, cannot execute workflows")
             return {
                 "workflow_type": workflow_type,
                 "status": "completed_fallback",
-                "message": "LangChain orchestrator not available, using fallback response",
+                "message": "Orchestrator not available, using fallback response",
                 "task_analysis": f"Detected workflow: {workflow_type} for questions: {workflow_input.get('questions', '')[:100]}...",
-                "recommendations": ["Set up LangChain integration", "Install required dependencies", "Configure OpenAI API key"],
+                "recommendations": ["Check workflow initialization", "Install required dependencies", "Configure OpenAI API key"],
                 "parameters_prepared": workflow_input.get("parameters", {}),
                 "files_processed": list(workflow_input.get("additional_files", {}).keys())
             }
