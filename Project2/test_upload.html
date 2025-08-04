@@ -203,7 +203,7 @@ curl "http://localhost:8000/api/tasks/{task_id}/status"</code></pre>
             showResult('loading', 'Submitting request...');
 
             try {
-                const response = await fetch('http://localhost:8000/api/', {
+                const response = await fetch('/api/', {
                     method: 'POST',
                     body: formData
                 });
