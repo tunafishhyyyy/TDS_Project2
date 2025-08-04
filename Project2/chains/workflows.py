@@ -52,6 +52,48 @@ class ExploratoryDataAnalysisWorkflow(BaseWorkflow):
                 "status": "error",
                 "timestamp": datetime.now().isoformat()
             }
+    
+    def _create_eda_prompt(self) -> ChatPromptTemplate:
+        """Create EDA-specific prompt"""
+        system_message = """You are an expert data scientist specializing in Exploratory Data Analysis (EDA).
+Your task is to provide a comprehensive EDA plan and insights based on the provided dataset information.
+
+Focus on:
+1. Data quality assessment
+2. Distribution analysis
+3. Correlation analysis
+4. Outlier detection
+5. Missing value analysis
+6. Feature engineering opportunities
+7. Visualization recommendations
+"""
+        
+        human_message = """
+Dataset Information:
+- Description: {dataset_description}
+- Columns: {columns_info}
+- Data Types: {data_types}
+- Sample Size: {sample_size}
+- Business Context: {business_context}
+
+Additional Parameters: {parameters}
+
+Provide a structured EDA plan including:
+1. Initial data inspection steps
+2. Statistical summaries to compute
+3. Visualizations to create
+4. Data quality checks
+5. Feature relationships to explore
+6. Potential data issues to investigate
+7. Python code snippets for key analyses
+
+Format your response with clear sections and actionable recommendations.
+"""
+        
+        return ChatPromptTemplate.from_messages([
+            ("system", system_message),
+            ("human", human_message)
+        ])
 
 
 class DataAnalysisWorkflow(BaseWorkflow):
@@ -231,48 +273,6 @@ df_sample = pd.DataFrame(sample_data)
                 "error": str(e),
                 "error_type": type(e).__name__
                         }
-    
-    def _create_eda_prompt(self) -> ChatPromptTemplate:
-        """Create EDA-specific prompt"""
-        system_message = """You are an expert data scientist specializing in Exploratory Data Analysis (EDA).
-Your task is to provide a comprehensive EDA plan and insights based on the provided dataset information.
-
-Focus on:
-1. Data quality assessment
-2. Distribution analysis
-3. Correlation analysis
-4. Outlier detection
-5. Missing value analysis
-6. Feature engineering opportunities
-7. Visualization recommendations
-"""
-        
-        human_message = """
-Dataset Information:
-- Description: {dataset_description}
-- Columns: {columns_info}
-- Data Types: {data_types}
-- Sample Size: {sample_size}
-- Business Context: {business_context}
-
-Additional Parameters: {parameters}
-
-Provide a structured EDA plan including:
-1. Initial data inspection steps
-2. Statistical summaries to compute
-3. Visualizations to create
-4. Data quality checks
-5. Feature relationships to explore
-6. Potential data issues to investigate
-7. Python code snippets for key analyses
-
-Format your response with clear sections and actionable recommendations.
-"""
-        
-        return ChatPromptTemplate.from_messages([
-            ("system", system_message),
-            ("human", human_message)
-        ])
 
 
 class PredictiveModelingWorkflow(BaseWorkflow):
