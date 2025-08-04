@@ -260,6 +260,450 @@ Provide detailed rationale for each recommendation.
                 "timestamp": datetime.now().isoformat()
             }
 
+class WebScrapingWorkflow(BaseWorkflow):
+    """Workflow for web scraping and data extraction"""
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.prompt_template = self._create_scraping_prompt()
+        self.chain = LLMChain(llm=self.llm, prompt=self.prompt_template)
+    
+    def _create_scraping_prompt(self) -> ChatPromptTemplate:
+        """Create web scraping prompt"""
+        system_message = """You are a web scraping expert specializing in data extraction from websites.
+Your task is to provide Python code and analysis for web scraping tasks.
+
+Focus on:
+1. URL analysis and data structure identification
+2. HTML parsing strategies using BeautifulSoup/Selenium
+3. Data cleaning and transformation
+4. Handling pagination and dynamic content
+5. Error handling and rate limiting
+6. Data validation and quality checks
+"""
+        
+        human_message = """
+Scraping Task: {task_description}
+Target URL: {url}
+Data Requirements: {data_requirements}
+Output Format: {output_format}
+Special Instructions: {special_instructions}
+
+Provide a complete solution including:
+1. Python code for scraping the data
+2. Data cleaning and processing steps
+3. Analysis of the extracted data
+4. Visualization code if requested
+5. Error handling strategies
+6. Expected output format
+
+Format your response with clear code blocks and explanations.
+"""
+        
+        return ChatPromptTemplate.from_messages([
+            ("system", system_message),
+            ("human", human_message)
+        ])
+    
+    async def execute(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute web scraping workflow"""
+        try:
+            result = self.chain.run(
+                task_description=input_data.get("task_description", ""),
+                url=input_data.get("url", ""),
+                data_requirements=input_data.get("data_requirements", ""),
+                output_format=input_data.get("output_format", "structured data"),
+                special_instructions=input_data.get("special_instructions", "")
+            )
+            
+            return {
+                "scraping_plan": result,
+                "workflow_type": "web_scraping",
+                "status": "completed",
+                "timestamp": datetime.now().isoformat(),
+                "target_url": input_data.get("url", "")
+            }
+            
+        except Exception as e:
+            logger.error(f"Error in web scraping workflow: {e}")
+            return {
+                "error": str(e),
+                "workflow_type": "web_scraping",
+                "status": "error",
+                "timestamp": datetime.now().isoformat()
+            }
+
+
+class DatabaseAnalysisWorkflow(BaseWorkflow):
+    """Workflow for database analysis using DuckDB and SQL"""
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.prompt_template = self._create_database_prompt()
+        self.chain = LLMChain(llm=self.llm, prompt=self.prompt_template)
+    
+    def _create_database_prompt(self) -> ChatPromptTemplate:
+        """Create database analysis prompt"""
+        system_message = """You are a database analysis expert specializing in SQL queries and data analysis.
+Your task is to provide SQL code and analysis strategies for complex datasets.
+
+Focus on:
+1. SQL query optimization for large datasets
+2. DuckDB-specific features and functions
+3. Data aggregation and statistical analysis
+4. Performance optimization strategies
+5. Cloud storage integration (S3, etc.)
+6. Data visualization and reporting
+"""
+        
+        human_message = """
+Analysis Task: {task_description}
+Database/Dataset: {database_info}
+Data Schema: {schema_info}
+Analysis Goals: {analysis_goals}
+Performance Requirements: {performance_requirements}
+
+Provide a comprehensive solution including:
+1. SQL queries for data analysis
+2. Performance optimization strategies
+3. Data processing pipeline
+4. Statistical analysis methods
+5. Visualization recommendations
+6. Expected insights and outputs
+
+Use DuckDB syntax and best practices for cloud data access.
+"""
+        
+        return ChatPromptTemplate.from_messages([
+            ("system", system_message),
+            ("human", human_message)
+        ])
+    
+    async def execute(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute database analysis workflow"""
+        try:
+            result = self.chain.run(
+                task_description=input_data.get("task_description", ""),
+                database_info=json.dumps(input_data.get("database_info", {}), indent=2),
+                schema_info=json.dumps(input_data.get("schema_info", {}), indent=2),
+                analysis_goals=input_data.get("analysis_goals", ""),
+                performance_requirements=input_data.get("performance_requirements", "")
+            )
+            
+            return {
+                "analysis_plan": result,
+                "workflow_type": "database_analysis",
+                "status": "completed",
+                "timestamp": datetime.now().isoformat(),
+                "database_type": "DuckDB"
+            }
+            
+        except Exception as e:
+            logger.error(f"Error in database analysis workflow: {e}")
+            return {
+                "error": str(e),
+                "workflow_type": "database_analysis",
+                "status": "error",
+                "timestamp": datetime.now().isoformat()
+            }
+
+
+class WikipediaAnalysisWorkflow(BaseWorkflow):
+    """Workflow specifically for Wikipedia data analysis tasks"""
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.prompt_template = self._create_wikipedia_prompt()
+        self.chain = LLMChain(llm=self.llm, prompt=self.prompt_template)
+    
+    def _create_wikipedia_prompt(self) -> ChatPromptTemplate:
+        """Create Wikipedia analysis prompt"""
+        system_message = """You are a Wikipedia data analysis expert.
+Your task is to analyze Wikipedia pages and extract structured data for analysis.
+
+Focus on:
+1. Wikipedia table extraction and parsing
+2. Data cleaning for Wikipedia-specific formatting
+3. Statistical analysis of extracted data
+4. Correlation and regression analysis
+5. Data visualization with base64 encoding
+6. Handling Wikipedia citations and footnotes
+"""
+        
+        human_message = """
+Wikipedia Analysis Task: {task_description}
+Wikipedia URL: {wikipedia_url}
+Target Tables/Data: {target_data}
+Analysis Questions: {analysis_questions}
+Visualization Requirements: {visualization_requirements}
+
+Provide a complete solution including:
+1. Python code to scrape Wikipedia tables
+2. Data cleaning for footnotes and formatting
+3. Statistical analysis code
+4. Visualization code with base64 encoding
+5. Answers to specific questions
+6. Performance optimizations
+
+Ensure the solution handles Wikipedia's specific formatting challenges.
+"""
+        
+        return ChatPromptTemplate.from_messages([
+            ("system", system_message),
+            ("human", human_message)
+        ])
+    
+    async def execute(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute Wikipedia analysis workflow"""
+        try:
+            result = self.chain.run(
+                task_description=input_data.get("task_description", ""),
+                wikipedia_url=input_data.get("wikipedia_url", ""),
+                target_data=input_data.get("target_data", ""),
+                analysis_questions=json.dumps(input_data.get("analysis_questions", []), indent=2),
+                visualization_requirements=input_data.get("visualization_requirements", "")
+            )
+            
+            return {
+                "analysis_plan": result,
+                "workflow_type": "wikipedia_analysis",
+                "status": "completed",
+                "timestamp": datetime.now().isoformat(),
+                "source_url": input_data.get("wikipedia_url", "")
+            }
+            
+        except Exception as e:
+            logger.error(f"Error in Wikipedia analysis workflow: {e}")
+            return {
+                "error": str(e),
+                "workflow_type": "wikipedia_analysis",
+                "status": "error",
+                "timestamp": datetime.now().isoformat()
+            }
+
+
+class LegalDataAnalysisWorkflow(BaseWorkflow):
+    """Workflow for legal/court data analysis"""
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.prompt_template = self._create_legal_prompt()
+        self.chain = LLMChain(llm=self.llm, prompt=self.prompt_template)
+    
+    def _create_legal_prompt(self) -> ChatPromptTemplate:
+        """Create legal data analysis prompt"""
+        system_message = """You are an expert in legal data analysis and Indian High Court systems.
+Your task is to analyze legal datasets, particularly court judgments and case data.
+
+Focus on:
+1. Legal terminology and court procedures
+2. Case disposal patterns and timelines
+3. Judicial efficiency metrics
+4. Court workload analysis
+5. Legal trend analysis
+6. Case outcome predictions
+7. Statistical analysis of legal proceedings
+"""
+        
+        human_message = """
+Task: {task_description}
+
+Legal Dataset Information: {dataset_info}
+
+Court System Context: {court_context}
+
+Analysis Parameters: {parameters}
+
+Please provide a comprehensive analysis plan for this legal data task, including:
+- Data preprocessing specific to legal documents
+- Relevant legal metrics and KPIs
+- Court system considerations
+- Timeline and case flow analysis
+- Visualization recommendations for legal data
+- Insights relevant to judicial administration
+"""
+        
+        return ChatPromptTemplate.from_messages([
+            ("system", system_message),
+            ("human", human_message)
+        ])
+    
+    async def execute(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute legal data analysis workflow"""
+        try:
+            result = self.chain.run(
+                task_description=input_data.get("task_description", ""),
+                dataset_info=json.dumps(input_data.get("dataset_info", {}), indent=2),
+                court_context=input_data.get("court_context", "Indian High Courts"),
+                parameters=json.dumps(input_data.get("parameters", {}), indent=2)
+            )
+            
+            return {
+                "analysis_plan": result,
+                "workflow_type": "legal_data_analysis",
+                "status": "completed",
+                "timestamp": datetime.now().isoformat(),
+                "domain": "legal",
+                "court_system": input_data.get("court_context", "Indian High Courts")
+            }
+            
+        except Exception as e:
+            logger.error(f"Error in legal data analysis workflow: {e}")
+            return {
+                "error": str(e),
+                "workflow_type": "legal_data_analysis",
+                "status": "error",
+                "timestamp": datetime.now().isoformat()
+            }
+
+
+class WikipediaScrapingWorkflow(BaseWorkflow):
+    """Enhanced workflow specifically for Wikipedia scraping and analysis"""
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.prompt_template = self._create_wikipedia_scraping_prompt()
+        self.chain = LLMChain(llm=self.llm, prompt=self.prompt_template)
+    
+    def _create_wikipedia_scraping_prompt(self) -> ChatPromptTemplate:
+        """Create Wikipedia scraping analysis prompt"""
+        system_message = """You are an expert in web scraping and Wikipedia data extraction.
+Your task is to analyze Wikipedia pages and extract structured data from tables and content.
+
+Focus on:
+1. Table structure identification and extraction
+2. Data cleaning and standardization
+3. Handling Wikipedia-specific formatting
+4. Statistical analysis of extracted data
+5. Data visualization recommendations
+6. Correlation and trend analysis
+"""
+        
+        human_message = """
+Task: {task_description}
+
+Wikipedia URL: {wikipedia_url}
+
+Target Data: {target_data_description}
+
+Analysis Goals: {analysis_goals}
+
+Please provide a comprehensive plan for:
+- Scraping strategy for the Wikipedia page
+- Table extraction and data cleaning methods
+- Statistical analysis approach
+- Visualization recommendations
+- Specific code snippets for data extraction
+- Expected data format and structure
+"""
+        
+        return ChatPromptTemplate.from_messages([
+            ("system", system_message),
+            ("human", human_message)
+        ])
+    
+    async def execute(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute Wikipedia scraping workflow"""
+        try:
+            result = self.chain.run(
+                task_description=input_data.get("task_description", ""),
+                wikipedia_url=input_data.get("wikipedia_url", ""),
+                target_data_description=input_data.get("target_data_description", ""),
+                analysis_goals=input_data.get("analysis_goals", "")
+            )
+            
+            return {
+                "scraping_plan": result,
+                "workflow_type": "wikipedia_scraping",
+                "status": "completed",
+                "timestamp": datetime.now().isoformat(),
+                "source": "wikipedia",
+                "url": input_data.get("wikipedia_url", "")
+            }
+            
+        except Exception as e:
+            logger.error(f"Error in Wikipedia scraping workflow: {e}")
+            return {
+                "error": str(e),
+                "workflow_type": "wikipedia_scraping",
+                "status": "error",
+                "timestamp": datetime.now().isoformat()
+            }
+
+
+class StatisticalAnalysisWorkflow(BaseWorkflow):
+    """Workflow for statistical analysis including correlation and regression"""
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.prompt_template = self._create_statistical_prompt()
+        self.chain = LLMChain(llm=self.llm, prompt=self.prompt_template)
+    
+    def _create_statistical_prompt(self) -> ChatPromptTemplate:
+        """Create statistical analysis prompt"""
+        system_message = """You are an expert statistician and data analyst.
+Your task is to perform comprehensive statistical analysis including correlation, regression, and trend analysis.
+
+Focus on:
+1. Descriptive statistics and data summarization
+2. Correlation analysis and interpretation
+3. Regression modeling and validation
+4. Statistical significance testing
+5. Trend analysis and forecasting
+6. Data visualization for statistical insights
+"""
+        
+        human_message = """
+Task: {task_description}
+
+Dataset Description: {dataset_description}
+
+Variables of Interest: {variables}
+
+Statistical Methods Required: {methods}
+
+Please provide:
+- Statistical analysis approach
+- Correlation analysis plan
+- Regression modeling strategy
+- Visualization recommendations
+- Code snippets for analysis
+- Interpretation guidelines
+"""
+        
+        return ChatPromptTemplate.from_messages([
+            ("system", system_message),
+            ("human", human_message)
+        ])
+    
+    async def execute(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute statistical analysis workflow"""
+        try:
+            result = self.chain.run(
+                task_description=input_data.get("task_description", ""),
+                dataset_description=input_data.get("dataset_description", ""),
+                variables=json.dumps(input_data.get("variables", []), indent=2),
+                methods=input_data.get("statistical_methods", "correlation, regression")
+            )
+            
+            return {
+                "statistical_plan": result,
+                "workflow_type": "statistical_analysis",
+                "status": "completed",
+                "timestamp": datetime.now().isoformat(),
+                "methods": input_data.get("statistical_methods", "correlation, regression")
+            }
+            
+        except Exception as e:
+            logger.error(f"Error in statistical analysis workflow: {e}")
+            return {
+                "error": str(e),
+                "workflow_type": "statistical_analysis",
+                "status": "error",
+                "timestamp": datetime.now().isoformat()
+            }
+
+
 class AdvancedWorkflowOrchestrator(WorkflowOrchestrator):
     """Enhanced orchestrator with domain-specific workflows"""
     
@@ -269,7 +713,13 @@ class AdvancedWorkflowOrchestrator(WorkflowOrchestrator):
         self.workflows.update({
             "exploratory_data_analysis": ExploratoryDataAnalysisWorkflow(),
             "predictive_modeling": PredictiveModelingWorkflow(),
-            "data_visualization": DataVisualizationWorkflow()
+            "data_visualization": DataVisualizationWorkflow(),
+            "web_scraping": WebScrapingWorkflow(),
+            "database_analysis": DatabaseAnalysisWorkflow(),
+            "wikipedia_analysis": WikipediaAnalysisWorkflow(),
+            "legal_data_analysis": LegalDataAnalysisWorkflow(),
+            "wikipedia_scraping": WikipediaScrapingWorkflow(),
+            "statistical_analysis": StatisticalAnalysisWorkflow()
         })
     
     async def execute_complete_analysis_pipeline(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -344,7 +794,13 @@ class AdvancedWorkflowOrchestrator(WorkflowOrchestrator):
                 "report_generation": "Create comprehensive analysis reports",
                 "exploratory_data_analysis": "Comprehensive EDA planning and execution",
                 "predictive_modeling": "Machine learning model development guidance",
-                "data_visualization": "Visualization recommendations and code generation"
+                "data_visualization": "Visualization recommendations and code generation",
+                "web_scraping": "Web scraping and data extraction from websites",
+                "database_analysis": "SQL analysis using DuckDB for large datasets",
+                "wikipedia_analysis": "Specialized Wikipedia data extraction and analysis",
+                "legal_data_analysis": "Analysis of legal/court data and judgments",
+                "wikipedia_scraping": "Enhanced Wikipedia scraping with table extraction",
+                "statistical_analysis": "Statistical analysis including correlation and regression"
             },
             "pipeline_capabilities": [
                 "complete_analysis_pipeline",
@@ -355,6 +811,9 @@ class AdvancedWorkflowOrchestrator(WorkflowOrchestrator):
                 "Error handling and recovery",
                 "Execution history tracking",
                 "Flexible input/output formats",
-                "Integration with multiple LLM providers"
+                "Integration with multiple LLM providers",
+                "Legal data analysis capabilities",
+                "Wikipedia specialized scraping",
+                "Statistical analysis and visualization"
             ]
         }

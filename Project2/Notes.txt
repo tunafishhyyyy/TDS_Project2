@@ -1,238 +1,56 @@
-# Overview of the Codebase
+1. Add logging to the code to track the execution flow and any errors that may occur.
+Missing: There is no logging for execution flow or errors. Only print statements and error handling.
+Action: Add Python logging (e.g., logging module) to main API endpoints, workflow detection, and orchestrator execution.
 
-## main.py
-- Sets up a FastAPI application with comprehensive file upload and analysis capabilities.
-- **Primary endpoint**: `POST /api/` - Accepts both file uploads and form data for analysis tasks.
-- **File upload support**: Can process text files, CSV, JSON, and other data formats.
-- **Form parameters**:
-  - `file`: Optional file upload (txt, csv, json, etc.)
-  - `task_description`: Description of the analysis task
-  - `workflow_type`: Type of workflow to execute (default: "data_analysis")
-  - `business_context`: Additional business context
-- **Legacy endpoint**: `POST /api/analyze` - Accepts JSON dictionary for backward compatibility.
-- **Status tracking**: `GET /api/tasks/{task_id}/status` - Check analysis progress and results.
-- **Background processing**: Asynchronous task execution with status updates.
-- **Example usage**: 
-  ```bash
-  curl "https://app.example.com/api/" -F "question.txt"
-  ```
+2. Modify the detect_workflow_type function to to use a more robust method for identifying the workflow type, we should use llm prompting to determine the workflow type based on the input.
+Missing: The current detect_workflow_type uses keyword matching, not LLM-based prompting.
+Action: Integrate an LLM (e.g., OpenAI, local model) to classify workflow type from the task description.
 
-## config.py
-- Contains configuration settings for the project:
-  - `API_VERSION = "v1"`
-  - `TIMEOUT = 180` (seconds)
+3.
+The endpoint must accept a POST request, e.g. POST https://<host>:<port>/api/ with a data analysis task description and optional attachments in the body. For example:
+curl "https://<host>:<port>/api/" -F "questions.txt=@question.txt" -F "image.png=@image.png" -F "data.csv=@data.csv"
+Partially Present: The /api/ endpoint accepts file uploads, but the code expects a single file or form data.
+Missing: Support for multiple files (e.g., questions.txt, image.png, data.csv) in one request.
+Action: Update endpoint to handle multiple files, always process questions.txt, and optionally process others.
 
-## requirements.txt
-- Lists the required Python packages:
-  - `fastapi`, `langchain`, `uvicorn`, `pandas`, `matplotlib`, `duckdb`, `requests`
 
-## Dockerfile
-- Describes how to build a Docker image for the project:
-  - Uses `python:3.9-slim` as the base image.
-  - Sets the working directory to `/app`.
-  - Copies the project files into the container.
-  - Installs dependencies from `requirements.txt`.
-  - Exposes port `80`.
-  - Sets an environment variable `NAME`.
-  - Runs the app using `uvicorn` (though the `CMD` references `src.main:app`, but your `main.py` is at the root, so this may need adjustment).
+4. The endpoint should return a JSON response with the results of the data analysis task, including any generated code, visualizations, or insights. (syncrhonously within 3 mins)
 
-## .vscode/tasks.json
-- Defines a VSCode task to run the FastAPI server using `uvicorn` with hot reload, referencing `src.main:app` (again, may need to be `main:app`).
+Missing: The API currently processes tasks asynchronously and returns a task ID for status polling.
+Action: Add synchronous processing for small tasks (return result within 3 minutes if possible).
 
-## chains/, tools/, utils/ (each with `__init__.py`)
-- These are Python packages intended for:
-  - `chains`: LangChain workflows.
-  - `tools`: Custom tools for data retrieval, analysis, etc.
-  - `utils`: Utility functions.
-- Currently, only contain placeholder comments.
 
----
+5. questions.txt will ALWAYS be sent and contain the questions. There may be zero or more additional files passed.
+Missing: The code does not enforce or expect questions.txt as a required file.
+Action: Update file handling logic to always process questions.txt and treat other files as optional.
 
-# Updated API Interface
+6. *These are not the final questions you’ll be evaluated on. These examples are indicative. so workflows like WikipediaScrapingWorkflow, LegalDataAnalysisWorkflow are
+too specific and should be generalized to DataAnalysisWorkflow or similar. 
+Present: There are specific workflows (WikipediaScrapingWorkflow, LegalDataAnalysisWorkflow).
+Missing: Generalized workflows (e.g., DataAnalysisWorkflow) for broader use cases.
+Action: Refactor or add generalized workflows, and allow easy extension.
 
-## File Upload Support
-The API has been enhanced to match the requirements shown in the example:
 
-### Primary Endpoint: `POST /api/`
-- **Supports file uploads**: Can accept text files (like `question.txt`) containing analysis questions or data.
-- **Form-based interface**: Uses multipart/form-data for file uploads.
-- **Flexible input**: Accepts both file uploads and direct text input.
+7. Include workflows for multi modal usecases like image analysis, text analysis, and code generation.
+Missing: No explicit support for image analysis, multi-modal (text+image), or code generation workflows.
+Action: Add workflow classes for image analysis, text analysis, and code generation.
 
-### Example Usage (matching the provided sample):
-```bash
-curl "https://app.example.com/api/" -F "file=@question.txt"
-```
+8. Geneerated code should be in Python and should be executable.
+Missing: No guarantee that generated code is Python or executable.
+Action: Ensure code generation workflow outputs Python code and optionally validates/explains execution.
+Execute the code and return the results 
 
-### Response Format:
-```json
-{
-  "message": "Task received and processing started",
-  "task_id": "uuid-here",
-  "status": "processing",
-  "endpoint_info": {
-    "status_check": "/api/tasks/{task_id}/status",
-    "estimated_time": "3 minutes"
-  }
-}
-```
+7. The code should be structured to allow for easy addition of new workflows in the future.
+Present: The orchestrator is extensible, but could be improved for easier workflow addition.
 
-### Status Checking:
-```bash
-GET /api/tasks/{task_id}/status
-```
+8. It would be good to have a test_upload.html file that can be used to test the API endpoint.
 
-### Supported File Types:
-- `.txt` files (questions, descriptions)
-- `.csv` files (data for analysis)
-- `.json` files (structured data)
-- Other text-based formats
+9. LLM output can it be checked for validity and correctness against another LLM before moving to the next step, 
+here we can use two different LLMs to cross-verify the output. however, this is not a requirement for the initial implementation. 
+(an LLM verify the output of another LLM)
+Present: No cross-verification of LLM outputs.
+Action: Implement a validation step using a second LLM to check the correctness of outputs before proceeding.
 
-### Form Parameters:
-- `file`: The uploaded file (optional)
-- `task_description`: Text description of the task (optional)
-- `workflow_type`: Type of analysis workflow (default: "data_analysis")
-- `business_context`: Additional context for the analysis (optional)
+10. Add an MIT LICENSE file to the project root.
 
----
-
-# Summary
-
-The project is scaffolded for a FastAPI-based API, with Docker support and a structure for future expansion (LangChain workflows, tools, utilities). Only a basic API endpoint is implemented so far. The project is ready for further development in the `chains`, `tools`, and `utils` packages.
-
----
-
-# LangChain Integration
-
-## 🚀 Complete LangChain Integration
-
-### 1. Enhanced API Structure
-- FastAPI application with LangChain workflow support.
-- Multiple workflow types for different analysis tasks.
-- Asynchronous execution with background task processing.
-- Comprehensive error handling and status tracking.
-
-### 2. LangChain Workflows (`chains` directory)
-#### Base Workflows (`base.py`):
-- `BaseWorkflow`: Abstract base class with LLM setup.
-- `DataAnalysisChain`: General data analysis using Chain class.
-- `CodeGenerationChain`: Python code generation.
-- `ReportGenerationChain`: Comprehensive report creation.
-- `WorkflowOrchestrator`: Basic workflow management.
-
-#### Specialized Workflows (`workflows.py`):
-- `ExploratoryDataAnalysisWorkflow`: EDA planning and execution.
-- `PredictiveModelingWorkflow`: ML model development guidance.
-- `DataVisualizationWorkflow`: Visualization recommendations.
-- `AdvancedWorkflowOrchestrator`: Enhanced orchestrator with pipelines.
-
-### 3. Key Features
-#### Multiple Workflow Types:
-- `data_analysis`: General analysis and recommendations.
-- `code_generation`: Python code for data tasks.
-- `report_generation`: Structured reports.
-- `exploratory_data_analysis`: EDA planning.
-- `predictive_modeling`: ML guidance.
-- `data_visualization`: Chart recommendations.
-
-#### Advanced Capabilities:
-- Multi-step pipelines: Chain workflows together.
-- Context passing: Results flow between steps.
-- Memory management: Conversation history.
-- Background processing: Non-blocking execution.
-- Complete analysis pipeline: End-to-end analysis.
-
-### 4. Required Libraries Added
-- `langchain`
-- `langchain-openai`
-- `langchain-community`
-- `langchain-core`
-- `langsmith`
-- `openai`
-- `python-dotenv`
-- `tiktoken`
-- `faiss-cpu`
-- `chromadb`
-- `jinja2`
-
-### 5. API Endpoints
-#### New LangChain Endpoints:
-- `POST /api/workflow`: Execute specific workflows.
-- `POST /api/pipeline`: Multi-step workflow pipelines.
-- `POST /api/analyze/complete`: Complete analysis pipeline.
-- `GET /api/capabilities`: Available workflows and features.
-
-#### Enhanced Existing Endpoints:
-- `POST /api/analyze`: Now supports workflow types and async execution.
-- `GET /api/tasks/{id}/status`: Shows workflow results and progress.
-
-### 6. Testing Infrastructure
-- Basic API tests (`test_api.py`): Core functionality.
-- LangChain tests (`test_langchain_api.py`): Workflow-specific testing.
-- **File upload tests (`test_file_upload_api.py`)**: Comprehensive testing for file upload functionality.
-- **HTML test interface (`test_upload.html`)**: Browser-based testing interface for file uploads.
-- **Sample files (`question.txt`)**: Example question file for testing file upload API.
-- Comprehensive test coverage for all workflow types.
-
-### 7. Documentation
-- `README.md`: Quick start guide.
-- `LANGCHAIN_GUIDE.md`: Comprehensive documentation.
-- `.env.template`: Environment setup template.
-
----
-
-# 🔧 How to Use LangChain Workflows
-
-## 1. Environment Setup
-```bash
-# Copy template and add your OpenAI API key
-cp .env.template .env
-```
-
-## 2. Basic Usage
-```bash
-# Simple analysis
-POST /api/analyze
-{
-    "task_description": "Analyze customer churn",
-    "workflow_type": "data_analysis",
-    "dataset_info": {...}
-}
-```
-
-## 3. Specific Workflow
-```bash
-# Execute EDA workflow
-POST /api/workflow
-{
-    "workflow_type": "exploratory_data_analysis",
-    "input_data": {
-        "dataset_info": {...},
-        "business_context": "Quarterly analysis"
-    }
-}
-```
-
-## 4. Multi-Step Pipeline
-```bash
-# Execute multiple workflows in sequence
-POST /api/pipeline
-{
-    "steps": [
-        {"workflow_type": "exploratory_data_analysis", "input_data": {...}},
-        {"workflow_type": "data_visualization", "input_data": {...}},
-        {"workflow_type": "report_generation", "input_data": {...}}
-    ]
-}
-```
-
----
-
-# 🎯 Key Benefits
-- **Intelligent Analysis**: LLM-powered insights and recommendations.
-- **Code Generation**: Automatic Python code creation for analysis tasks.
-- **Flexible Workflows**: Multiple specialized analysis types.
-- **Scalable Architecture**: Asynchronous processing and pipeline support.
-- **Comprehensive Documentation**: Detailed guides and examples.
-
-The system is now ready for sophisticated data analysis workflows using LangChain's powerful LLM orchestration capabilities! You can start the server and test the various workflows to see the AI-powered analysis in action.
 

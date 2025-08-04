@@ -10,13 +10,15 @@ from pydantic import BaseModel, Field
 from typing import Dict, Any, Optional, List, Union
 import sys
 import os
+import re
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from config import API_VERSION, TIMEOUT
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'chains'))
 try:
     from workflows import AdvancedWorkflowOrchestrator
     orchestrator = AdvancedWorkflowOrchestrator()
-except ImportError:
+except ImportError as e:
+    print(f"Warning: Could not import workflows: {e}")
     orchestrator = None
 
 from fastapi.staticfiles import StaticFiles
@@ -61,6 +63,252 @@ class TaskResponse(BaseModel):
 # In-memory storage for background tasks (in production, use a proper database)
 tasks_storage = {}
 
+def detect_workflow_type(task_description: str, default_workflow: str = "data_analysis") -> str:
+    """Intelligent workflow type detection based on task description"""
+    if not task_description:
+        return default_workflow
+    
+    task_lower = task_description.lower()
+    
+    # Legal/Court data patterns
+    if any(keyword in task_lower for keyword in ['court', 'judgment', 'legal', 'case', 'disposal', 'judge', 'cnr', 'ecourts']):
+        return "legal_data_analysis"
+    
+    # Wikipedia patterns
+    if any(keyword in task_lower for keyword in ['wikipedia', 'wiki', 'scrape', 'list of', 'table from']):
+        return "wikipedia_scraping"
+    
+    # Statistical analysis patterns
+    if any(keyword in task_lower for keyword in ['correlation', 'regression', 'statistical', 'trend', 'slope']):
+        return "statistical_analysis"
+    
+    # Database analysis patterns
+    if any(keyword in task_lower for keyword in ['sql', 'duckdb', 'database', 'query', 'parquet', 's3://']):
+        return "database_analysis"
+    
+    # Data visualization patterns
+    if any(keyword in task_lower for keyword in ['plot', 'chart', 'graph', 'visualization', 'scatterplot', 'base64', 'data uri']):
+        return "data_visualization"
+    
+    # Exploratory data analysis patterns
+    if any(keyword in task_lower for keyword in ['explore', 'eda', 'exploratory', 'distribution', 'summary']):
+        return "exploratory_data_analysis"
+    
+    # Predictive modeling patterns
+    if any(keyword in task_lower for keyword in ['predict', 'model', 'machine learning', 'ml', 'forecast']):
+        return "predictive_modeling"
+    
+    # Code generation patterns
+    if any(keyword in task_lower for keyword in ['generate code', 'python code', 'script', 'function']):
+        return "code_generation"
+    
+    # Web scraping patterns
+    if any(keyword in task_lower for keyword in ['scrape', 'extract', 'web', 'html', 'website']):
+        return "web_scraping"
+    
+    return default_workflow
+
+def prepare_workflow_parameters(task_description: str, workflow_type: str, file_content: str = None) -> Dict[str, Any]:
+    """Prepare workflow-specific parameters based on task and content"""
+    parameters = {}
+    
+    if workflow_type == "legal_data_analysis":
+        parameters.update({
+            "court_context": "Indian High Courts",
+            "dataset_info": {
+                "type": "legal_judgments",
+                "source": "ecourts.gov.in",
+                "columns": ["court_code", "title", "description", "judge", "pdf_link", "cnr", "date_of_registration", "decision_date", "disposal_nature"]
+            }
+        })
+    
+    elif workflow_type == "wikipedia_scraping":
+        # Extract Wikipedia URL if present
+        url_match = re.search(r'https?://[^\s]+wikipedia[^\s]+', task_description)
+        if url_match:
+            parameters["wikipedia_url"] = url_match.group()
+        
+        parameters.update({
+            "target_data_description": "table data extraction",
+            "analysis_goals": "statistical analysis and visualization"
+        })
+    
+    elif workflow_type == "statistical_analysis":
+        parameters.update({
+            "statistical_methods": "correlation, regression, trend analysis",
+            "variables": ["rank", "peak", "revenue", "year"]
+        })
+    
+    elif workflow_type == "database_analysis":
+        parameters.update({
+            "database_type": "DuckDB",
+            "data_source": "S3/Parquet files",
+            "schema_info": {
+                "court_data": ["court_code", "title", "judge", "date_of_registration", "decision_date"]
+            }
+        })
+    
+    return parameters
+
+def extract_output_requirements(task_description: str) -> Dict[str, Any]:
+    """Extract specific output requirements from task description"""
+    requirements = {
+        "format": "json",
+        "include_visualizations": False,
+        "response_time_limit": "3 minutes"
+    }
+    
+    task_lower = task_description.lower()
+    
+    # Check for visualization requirements
+    if any(keyword in task_lower for keyword in ['plot', 'chart', 'graph', 'visualization', 'base64', 'data uri']):
+        requirements["include_visualizations"] = True
+        requirements["visualization_format"] = "base64_data_uri"
+        requirements["max_size"] = "100000 bytes"
+    
+    # Check for specific format requirements
+    if "json" in task_lower:
+        requirements["format"] = "json"
+    elif "csv" in task_lower:
+        requirements["format"] = "csv"
+    elif "table" in task_lower:
+        requirements["format"] = "table"
+    
+    return requirements
+
+def detect_workflow_type(task_description: str, default_workflow: str = "data_analysis") -> str:
+    """
+    Intelligently detect workflow type based on task description keywords
+    """
+    if not task_description:
+        return default_workflow
+    
+    task_lower = task_description.lower()
+    
+    # Wikipedia-related tasks (Example 1: highest grossing films)
+    if any(word in task_lower for word in ["wikipedia", "wiki", "scrape", "highest grossing", "films", "extract from web"]):
+        return "wikipedia_analysis"
+    
+    # Database/SQL analysis tasks (Example 2: Indian High Court dataset)
+    if any(word in task_lower for word in ["sql", "duckdb", "database", "query", "table", "parquet", "s3://", "high court", "judgments", "metadata"]):
+        return "database_analysis"
+    
+    # General web scraping tasks
+    if any(word in task_lower for word in ["scrape", "scraping", "web scraping", "extract data", "crawl", "html"]):
+        return "web_scraping"
+    
+    # Tasks requiring visualization (scatterplot, regression line, base64 encoding)
+    if any(word in task_lower for word in ["scatterplot", "regression line", "base64", "data uri", "plot", "chart", "graph", "visualize", "visualization", "dashboard"]):
+        return "data_visualization"
+    
+    # Exploratory Data Analysis
+    if any(word in task_lower for word in ["eda", "exploratory", "explore", "summary statistics", "data exploration", "correlation", "rank", "peak"]):
+        return "exploratory_data_analysis"
+    
+    # Predictive modeling
+    if any(word in task_lower for word in ["predict", "model", "machine learning", "ml", "forecast", "classification", "regression", "slope"]):
+        return "predictive_modeling"
+    
+    # Code generation
+    if any(word in task_lower for word in ["code", "script", "python", "generate code", "programming"]):
+        return "code_generation"
+    
+    # Report generation
+    if any(word in task_lower for word in ["report", "summary", "document", "presentation"]):
+        return "report_generation"
+    
+    return default_workflow
+
+def prepare_workflow_parameters(task_description: str, workflow_type: str, file_content: str = None) -> Dict[str, Any]:
+    """
+    Prepare specific parameters based on workflow type and task description
+    """
+    params = {}
+    task_lower = task_description.lower() if task_description else ""
+    
+    if workflow_type == "wikipedia_analysis":
+        # Extract Wikipedia URLs or topics
+        if "wikipedia.org" in task_lower:
+            import re
+            urls = re.findall(r'https?://[^\s]+wikipedia[^\s]+', task_description)
+            params["target_urls"] = urls
+        if "highest grossing" in task_lower:
+            params["data_type"] = "movie_revenue"
+            params["table_indicators"] = ["rank", "peak", "film", "gross"]
+    
+    elif workflow_type == "database_analysis":
+        # DuckDB and S3 parameters
+        if "s3://" in task_lower:
+            import re
+            s3_paths = re.findall(r's3://[^\s]+', task_description)
+            params["s3_paths"] = s3_paths
+        if "duckdb" in task_lower:
+            params["database_type"] = "duckdb"
+        if "parquet" in task_lower:
+            params["file_format"] = "parquet"
+        if "high court" in task_lower:
+            params["domain"] = "legal_judgments"
+            params["table_schema"] = {
+                "court_code": "VARCHAR",
+                "title": "VARCHAR", 
+                "judge": "VARCHAR",
+                "decision_date": "DATE",
+                "disposal_nature": "VARCHAR"
+            }
+    
+    elif workflow_type == "data_visualization":
+        # Visualization parameters
+        if "scatterplot" in task_lower:
+            params["chart_type"] = "scatter"
+        if "regression line" in task_lower:
+            params["include_regression"] = True
+        if "base64" in task_lower or "data uri" in task_lower:
+            params["output_format"] = "base64_uri"
+            params["max_size"] = 100000  # 100KB limit
+        if "dotted red" in task_lower:
+            params["line_style"] = {"color": "red", "style": "dotted"}
+    
+    # Add file content analysis
+    if file_content:
+        params["file_content_length"] = len(file_content)
+        if file_content.strip().startswith('{') or file_content.strip().startswith('['):
+            params["content_type"] = "json"
+        elif '\t' in file_content or ',' in file_content:
+            params["content_type"] = "csv"
+        else:
+            params["content_type"] = "text"
+    
+    return params
+
+def extract_output_requirements(task_description: str) -> Dict[str, Any]:
+    """
+    Extract specific output format requirements from task description
+    """
+    requirements = {}
+    task_lower = task_description.lower() if task_description else ""
+    
+    # Time constraints
+    if "3 minutes" in task_lower or "within 3" in task_lower:
+        requirements["time_limit"] = 180  # seconds
+    
+    # Format requirements
+    if "json" in task_lower:
+        requirements["format"] = "json"
+    if "base64" in task_lower:
+        requirements["encoding"] = "base64"
+    if "data uri" in task_lower:
+        requirements["uri_format"] = True
+    if "under 100,000" in task_lower or "100,000 bytes" in task_lower:
+        requirements["size_limit"] = 100000
+    
+    # Response structure
+    if "array" in task_lower:
+        requirements["structure"] = "array"
+    elif "object" in task_lower:
+        requirements["structure"] = "object"
+    
+    return requirements
+
 @app.post("/api/")
 async def analyze_data(
     file: Optional[UploadFile] = File(None),
@@ -78,53 +326,84 @@ async def analyze_data(
     """
     try:
         task_id = str(uuid.uuid4())
-        
         # Handle file upload
         file_content = None
         if file:
             content = await file.read()
             file_content = content.decode('utf-8')
-            
-            # If no task description provided, use file content as task
             if not task_description:
                 task_description = f"Analyze the data from file: {file.filename}"
-        
         # Validate input
         if not task_description and not file_content:
             raise HTTPException(
-                status_code=400, 
+                status_code=400,
                 detail="Either task_description or file must be provided"
             )
+        # Intelligent workflow type detection based on task description
+        detected_workflow = detect_workflow_type(task_description, workflow_type)
         
-        # Create task data
-        task_data = {
+        # Prepare enhanced workflow input for LangChain orchestrator
+        workflow_input = {
+            "task_description": task_description,
+            "file_name": file.filename if file else None,
+            "file_content": file_content,
+            "workflow_type": detected_workflow,
+            "business_context": business_context,
+            "parameters": prepare_workflow_parameters(task_description, detected_workflow, file_content),
+            "output_requirements": extract_output_requirements(task_description)
+        }
+        # Store initial task
+        tasks_storage[task_id] = {
             "task_id": task_id,
             "task_description": task_description,
-            "workflow_type": workflow_type,
+            "workflow_type": detected_workflow,
+            "original_workflow_type": workflow_type,
             "business_context": business_context,
             "file_name": file.filename if file else None,
             "file_content": file_content,
-            "status": "received",
+            "status": "processing",
             "created_at": datetime.now().isoformat(),
-            "result": None
+            "result": None,
+            "workflow_detected": detected_workflow != workflow_type
         }
         
-        # Store task
-        tasks_storage[task_id] = task_data
+        # Run LangChain workflow in background
+        async def run_workflow():
+            try:
+                if orchestrator is None:
+                    # Fallback when LangChain is not available
+                    result = {
+                        "workflow_type": detected_workflow,
+                        "status": "completed_fallback",
+                        "message": "LangChain orchestrator not available, using fallback response",
+                        "task_analysis": f"Detected workflow: {detected_workflow} for task: {task_description}",
+                        "recommendations": ["Set up LangChain integration", "Install required dependencies", "Configure OpenAI API key"],
+                        "parameters_prepared": workflow_input.get("parameters", {}),
+                        "output_requirements": workflow_input.get("output_requirements", {})
+                    }
+                else:
+                    result = await orchestrator.execute_workflow(detected_workflow, workflow_input)
+                
+                tasks_storage[task_id]["result"] = result
+                tasks_storage[task_id]["status"] = "completed"
+                tasks_storage[task_id]["completed_at"] = datetime.now().isoformat()
+            except Exception as e:
+                tasks_storage[task_id]["status"] = "failed"
+                tasks_storage[task_id]["error"] = str(e)
         
-        # Start background processing (simulate)
-        asyncio.create_task(process_analysis_task(task_id))
+        asyncio.create_task(run_workflow())
         
         return {
             "message": "Task received and processing started",
             "task_id": task_id,
             "status": "processing",
+            "workflow_type": detected_workflow,
+            "workflow_auto_detected": detected_workflow != workflow_type,
             "endpoint_info": {
                 "status_check": f"/api/tasks/{task_id}/status",
                 "estimated_time": "3 minutes"
             }
         }
-        
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing request: {str(e)}")
 

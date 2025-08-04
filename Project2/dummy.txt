@@ -1,3 +1,9 @@
-This is a test file.
-It contains sample text for upload testing.
-Line 3: End of file.
+Scrape the table from this Wikipedia page:
+https://en.wikipedia.org/wiki/List_of_countries_by_GDP_(nominal)
+Then:
+Clean the data — remove footnote references and extra symbols.
+Convert GDP numbers to numeric format.
+Plot top 10 countries by GDP.
+Answer:
+Which country ranks 5th by GDP?
+What is the total GDP of the top 10 countries?
