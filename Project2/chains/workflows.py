@@ -671,7 +671,7 @@ class AdvancedWorkflowOrchestrator(WorkflowOrchestrator):
         self.workflows.update({
             "data_analysis": DataAnalysisWorkflow(),
             "image_analysis": ImageAnalysisWorkflow(),
-            "text_analysis": TextAnalysisWorkflow(),
+            "text_analysis": DataAnalysisWorkflow(),
             "code_generation": CodeGenerationWorkflow(),
             "exploratory_data_analysis": ExploratoryDataAnalysisWorkflow(),
             "predictive_modeling": PredictiveModelingWorkflow(),
