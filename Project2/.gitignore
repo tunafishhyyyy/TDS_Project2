@@ -1,0 +1,80 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+*.log
+*.sqlite3
+*.db
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# Environment
+.env
+.env.*
+*.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+*.pid
+*.pid.lock
+docker-compose.override.yml
+
+# Test & Coverage
+.coverage
+htmlcov/
+*.cover
+*.py,cover
+.cache
+nosetests.xml
+coverage.xml
+*.mocha
+
+# LangChain
+langchain.db
+langchain_tracing/
+
+# Misc
+*.bak
+*.swp
+*.tmp
+*.old
+
+# Node
+node_modules/
+
+# Reports
+*.csv
+*.tsv
+*.xlsx
+*.xls
+*.parquet
+*.feather
+*.h5
+*.jsonl
+*.out
+*.pdf
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+
+# Ignore test files
+question.txt
+test_file_upload_api.py
+test_upload.html
+check_installation.py

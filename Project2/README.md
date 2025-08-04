@@ -17,18 +17,31 @@ cp .env.template .env
 # Edit .env and add your OpenAI API key
 ```
 
-3. **Start the server:**
+3. **Start the server (development):**
 
 ```bash
-uvicorn src.main:app --reload
+uvicorn main:app --reload
 ```
 
-4. **Test the API:**
+4. **Build and run with Docker:**
+
+```bash
+bash run_docker.sh
+# Or manually:
+docker build -t data-analysis-api .
+docker run -d --name data-analysis-api-container -p 8000:80 --env-file .env data-analysis-api
+```
+
+5. **Test the API:**
 
 ```bash
 python test_api.py              # Basic tests
+python test_file_upload_api.py  # File upload tests
 python test_langchain_api.py    # LangChain workflow tests
 ```
+
+6. **Test in browser:**
+- Open `test_upload.html` in your browser for a user-friendly file upload and workflow interface.
 
 ## Available Workflows
 
@@ -41,7 +54,8 @@ python test_langchain_api.py    # LangChain workflow tests
 
 ## API Endpoints
 
-- `POST /api/analyze` - Submit analysis tasks
+- `POST /api/` - Submit analysis tasks (file upload or form data)
+- `POST /api/analyze` - Legacy JSON endpoint
 - `POST /api/workflow` - Execute specific workflows
 - `POST /api/pipeline` - Multi-step workflow pipelines
 - `POST /api/analyze/complete` - Complete analysis pipeline
@@ -50,6 +64,7 @@ python test_langchain_api.py    # LangChain workflow tests
 
 ## Example Usage
 
+### Python (basic analysis)
 ```python
 import requests
 
@@ -69,6 +84,11 @@ task_id = response.json()["task_id"]
 # Check status
 status = requests.get(f"http://localhost:8000/api/tasks/{task_id}/status")
 print(status.json())
+```
+
+### Curl (file upload)
+```bash
+curl "http://localhost:8000/api/" -F "file=@question.txt" -F "workflow_type=data_analysis"
 ```
 
 ## Configuration

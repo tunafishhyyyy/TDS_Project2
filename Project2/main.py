@@ -6,12 +6,54 @@ from typing import Optional, Union
 import uuid
 import asyncio
 from datetime import datetime
+from pydantic import BaseModel, Field
+from typing import Dict, Any, Optional, List, Union
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+from config import API_VERSION, TIMEOUT
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'chains'))
+try:
+    from workflows import AdvancedWorkflowOrchestrator
+    orchestrator = AdvancedWorkflowOrchestrator()
+except ImportError:
+    orchestrator = None
 
 app = FastAPI(
     title="Data Analysis API",
     description="An API that uses LLMs to source, prepare, analyze, and visualize any data.",
     version="1.0.0"
 )
+# Pydantic models for request/response
+class TaskRequest(BaseModel):
+    """Model for analysis task requests"""
+    task_description: str = Field(..., description="Description of the analysis task")
+    workflow_type: Optional[str] = Field("data_analysis", description="Type of workflow to execute")
+    data_source: Optional[str] = Field(None, description="Optional data source information")
+    dataset_info: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Dataset characteristics and metadata")
+    parameters: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Additional parameters for the task")
+    priority: Optional[str] = Field("normal", description="Task priority: low, normal, high")
+    include_modeling: Optional[bool] = Field(False, description="Include predictive modeling in analysis")
+    target_audience: Optional[str] = Field("technical team", description="Target audience for reports")
+
+class WorkflowRequest(BaseModel):
+    """Model for specific workflow requests"""
+    workflow_type: str = Field(..., description="Type of workflow to execute")
+    input_data: Dict[str, Any] = Field(..., description="Input data for the workflow")
+
+class MultiStepWorkflowRequest(BaseModel):
+    """Model for multi-step workflow requests"""
+    steps: List[Dict[str, Any]] = Field(..., description="List of workflow steps to execute")
+    pipeline_type: Optional[str] = Field("custom", description="Type of pipeline")
+
+class TaskResponse(BaseModel):
+    """Model for task response"""
+    task_id: str = Field(..., description="Unique identifier for the task")
+    status: str = Field(..., description="Task status")
+    message: str = Field(..., description="Response message")
+    task_details: Dict[str, Any] = Field(..., description="Details of the submitted task")
+    created_at: str = Field(..., description="Task creation timestamp")
+    workflow_result: Optional[Dict[str, Any]] = Field(None, description="LangChain workflow execution result")
 
 # In-memory storage for background tasks (in production, use a proper database)
 tasks_storage = {}
