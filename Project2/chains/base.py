@@ -38,11 +38,12 @@ class BaseWorkflow(ABC):
     """Abstract base class for all LangChain workflows"""
     
     def __init__(self, model_name: str = DEFAULT_MODEL, temperature: float = TEMPERATURE):
-        self.model_name = model_name
-        self.temperature = temperature
-        self.llm = None
-        self.embeddings = None
-        self.memory = None
+        # Bypass Pydantic __setattr__ to allow attribute assignment
+        object.__setattr__(self, 'model_name', model_name)
+        object.__setattr__(self, 'temperature', temperature)
+        object.__setattr__(self, 'llm', None)
+        object.__setattr__(self, 'embeddings', None)
+        object.__setattr__(self, 'memory', None)
         self._setup_components()
     
     def _setup_components(self):
