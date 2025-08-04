@@ -20,7 +20,38 @@ class ExploratoryDataAnalysisWorkflow(BaseWorkflow):
         super().__init__(**kwargs)
         self.prompt_template = self._create_eda_prompt()
         self.chain = LLMChain(llm=self.llm, prompt=self.prompt_template)
-
+    
+    async def execute(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute EDA workflow"""
+        try:
+            # Extract dataset information
+            dataset_info = input_data.get("dataset_info", {})
+            
+            result = self.chain.run(
+                dataset_description=dataset_info.get("description", "Unknown dataset"),
+                columns_info=json.dumps(dataset_info.get("columns", []), indent=2),
+                data_types=json.dumps(dataset_info.get("data_types", {}), indent=2),
+                sample_size=dataset_info.get("sample_size", "Unknown"),
+                business_context=input_data.get("business_context", "General analysis"),
+                parameters=json.dumps(input_data.get("parameters", {}), indent=2)
+            )
+            
+            return {
+                "eda_plan": result,
+                "workflow_type": "exploratory_data_analysis",
+                "status": "completed",
+                "timestamp": datetime.now().isoformat(),
+                "dataset_summary": dataset_info
+            }
+            
+        except Exception as e:
+            logger.error(f"Error in EDA workflow: {e}")
+            return {
+                "error": str(e),
+                "workflow_type": "exploratory_data_analysis",
+                "status": "error",
+                "timestamp": datetime.now().isoformat()
+            }
 
 
 class DataAnalysisWorkflow(BaseWorkflow):
@@ -241,38 +272,7 @@ Format your response with clear sections and actionable recommendations.
             ("system", system_message),
             ("human", human_message)
         ])
-    
-    async def execute(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute EDA workflow"""
-        try:
-            # Extract dataset information
-            dataset_info = input_data.get("dataset_info", {})
-            
-            result = self.chain.run(
-                dataset_description=dataset_info.get("description", "Unknown dataset"),
-                columns_info=json.dumps(dataset_info.get("columns", []), indent=2),
-                data_types=json.dumps(dataset_info.get("data_types", {}), indent=2),
-                sample_size=dataset_info.get("sample_size", "Unknown"),
-                business_context=input_data.get("business_context", "General analysis"),
-                parameters=json.dumps(input_data.get("parameters", {}), indent=2)
-            )
-            
-            return {
-                "eda_plan": result,
-                "workflow_type": "exploratory_data_analysis",
-                "status": "completed",
-                "timestamp": datetime.now().isoformat(),
-                "dataset_summary": dataset_info
-            }
-            
-        except Exception as e:
-            logger.error(f"Error in EDA workflow: {e}")
-            return {
-                "error": str(e),
-                "workflow_type": "exploratory_data_analysis",
-                "status": "error",
-                "timestamp": datetime.now().isoformat()
-            }
+
 
 class PredictiveModelingWorkflow(BaseWorkflow):
     """Workflow for predictive modeling tasks"""
