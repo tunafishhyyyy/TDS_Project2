@@ -8,7 +8,6 @@ from langchain.schema import BaseMessage, HumanMessage, AIMessage, SystemMessage
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain.memory import ConversationBufferMemory, ConversationBufferWindowMemory
 from langchain.callbacks.manager import CallbackManagerForChainRun
-from langchain.chains.base import Chain
 from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
 from langchain.chains import LLMChain, ConversationChain
 from langchain.chains.combine_documents import create_stuff_documents_chain
@@ -83,18 +82,13 @@ class BaseWorkflow(ABC):
         self.memory.chat_memory.add_user_message(human_input)
         self.memory.chat_memory.add_ai_message(ai_response)
 
-class DataAnalysisChain(Chain, BaseWorkflow):
+class DataAnalysisChain(BaseWorkflow):
     """Chain for data analysis tasks"""
     
-    
-    # Define required abstract attributes to allow instantiation
-    input_keys: List[str] = ["task_description", "data_context", "parameters"]
-    output_keys: List[str] = ["analysis_result", "recommendations", "metadata"]
     def __init__(self, model_name: str = DEFAULT_MODEL, temperature: float = TEMPERATURE, **kwargs):
-        BaseWorkflow.__init__(self, model_name=model_name, temperature=temperature, **kwargs)
-        Chain.__init__(self)
-        object.__setattr__(self, 'prompt_template', self._create_analysis_prompt())
-        object.__setattr__(self, 'chain', LLMChain(llm=object.__getattribute__(self, 'llm'), prompt=self.prompt_template))
+        super().__init__(model_name=model_name, temperature=temperature)
+        self.prompt_template = self._create_analysis_prompt()
+        self.chain = LLMChain(llm=self.llm, prompt=self.prompt_template)
     
     def _create_analysis_prompt(self) -> ChatPromptTemplate:
         """Create the prompt template for data analysis"""
@@ -195,8 +189,8 @@ class CodeGenerationChain(BaseWorkflow):
     
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        object.__setattr__(self, 'prompt_template', self._create_code_prompt())
-        object.__setattr__(self, 'chain', LLMChain(llm=object.__getattribute__(self, 'llm'), prompt=self.prompt_template))
+        self.prompt_template = self._create_code_prompt()
+        self.chain = LLMChain(llm=self.llm, prompt=self.prompt_template)
     
     def _create_code_prompt(self) -> PromptTemplate:
         """Create prompt for code generation"""
@@ -260,8 +254,8 @@ class ReportGenerationChain(BaseWorkflow):
     
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        object.__setattr__(self, 'prompt_template', self._create_report_prompt())
-        object.__setattr__(self, 'chain', LLMChain(llm=object.__getattribute__(self, 'llm'), prompt=self.prompt_template))
+        self.prompt_template = self._create_report_prompt()
+        self.chain = LLMChain(llm=self.llm, prompt=self.prompt_template)
     
     def _create_report_prompt(self) -> PromptTemplate:
         """Create prompt for report generation"""
