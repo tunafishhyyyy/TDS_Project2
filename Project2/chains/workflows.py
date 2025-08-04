@@ -231,6 +231,7 @@ df_sample = pd.DataFrame(sample_data)
                 "error": str(e),
                 "error_type": type(e).__name__
             }
+    
     def _create_eda_prompt(self) -> ChatPromptTemplate:
         """Create EDA-specific prompt"""
         system_message = """You are an expert data scientist specializing in Exploratory Data Analysis (EDA).
