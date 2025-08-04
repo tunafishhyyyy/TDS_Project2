@@ -2,6 +2,43 @@
 
 A FastAPI-based REST API that uses LangChain to orchestrate LLM workflows for data analysis tasks.
 
+## VM Setup & Installation (Linux)
+
+Follow these steps to set up a fresh VM and run the project:
+
+```bash
+# Update system packages
+sudo apt-get update && sudo apt-get upgrade -y
+
+# Install git, Docker, and vi editor
+sudo apt-get install -y git docker.io vim
+
+# (Optional) Install Python if you want to run locally
+sudo apt-get install -y python3 python3-pip
+
+# Enable and start Docker
+sudo systemctl enable docker
+sudo systemctl start docker
+
+# Add your user to the docker group (optional, for non-root usage)
+sudo usermod -aG docker $USER
+# You may need to log out and log back in for group changes to take effect
+
+# Clone the public repository
+# Replace <your-repo-url> with the actual repo URL
+git clone https://github.com/tunafishhyyyy/TDS_Project2.git
+cd TDS_Project2/Project2
+
+# Copy and edit environment variables
+cp .env.template .env
+vim .env  # Add your OpenAI API key and other secrets
+
+# Build and run the Docker container
+bash run_docker.sh
+
+# The API will be available at http://localhost:8000/
+```
+
 ## Quick Start
 
 1. **Install dependencies:**
@@ -41,7 +78,8 @@ python test_langchain_api.py    # LangChain workflow tests
 ```
 
 6. **Test in browser:**
-- Open `test_upload.html` in your browser for a user-friendly file upload and workflow interface.
+
+- Open `http://84.247.184.189:8000/static/test_upload.html` in your browser for a user-friendly file upload and workflow interface.
 
 ## Available Workflows
 
@@ -65,6 +103,7 @@ python test_langchain_api.py    # LangChain workflow tests
 ## Example Usage
 
 ### Python (basic analysis)
+
 ```python
 import requests
 
@@ -87,8 +126,9 @@ print(status.json())
 ```
 
 ### Curl (file upload)
+
 ```bash
-curl "http://localhost:8000/api/" -F "file=@question.txt" -F "workflow_type=data_analysis"
+curl "http://84.247.184.189:8000/api/" -F "file=@question.txt" -F "workflow_type=data_analysis"
 ```
 
 ## Configuration

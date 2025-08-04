@@ -19,11 +19,14 @@ try:
 except ImportError:
     orchestrator = None
 
+from fastapi.staticfiles import StaticFiles
+
 app = FastAPI(
     title="Data Analysis API",
     description="An API that uses LLMs to source, prepare, analyze, and visualize any data.",
     version="1.0.0"
 )
+app.mount("/static", StaticFiles(directory="."), name="static")
 # Pydantic models for request/response
 class TaskRequest(BaseModel):
     """Model for analysis task requests"""
