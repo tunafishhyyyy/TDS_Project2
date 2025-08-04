@@ -81,13 +81,25 @@ async def detect_workflow_type_llm(task_description: str, default_workflow: str 
 
 ## Testing
 
-Created `test_multi_step_workflow.py` to verify the fixes:
+Created multiple test scripts to verify the fixes:
 
+### Basic Test
 ```bash
 python test_multi_step_workflow.py
 ```
 
-This script tests the multi-step workflow with the questions.txt file and provides detailed output about:
+### Improved Test with Dependency Checking
+```bash
+python test_improved_workflow.py
+```
+
+### Install Dependencies
+```bash
+python install_dependencies.py
+```
+
+These scripts test the multi-step workflow with the questions.txt file and provide detailed output about:
+- Dependency availability
 - Scraping plan generation
 - Code execution results
 - Output variables captured
@@ -119,5 +131,8 @@ The enhanced logging will now show:
 
 1. `chains/workflows.py` - Added MultiStepWebScrapingWorkflow
 2. `main.py` - Enhanced logging and workflow detection
-3. `test_multi_step_workflow.py` - Test script (new)
-4. `MULTI_STEP_FIXES.md` - This documentation (new) 
+3. `requirements.txt` - Added missing dependencies (beautifulsoup4, lxml, html5lib)
+4. `test_multi_step_workflow.py` - Basic test script (new)
+5. `test_improved_workflow.py` - Improved test with dependency checking (new)
+6. `install_dependencies.py` - Dependency installation script (new)
+7. `MULTI_STEP_FIXES.md` - This documentation (new) 

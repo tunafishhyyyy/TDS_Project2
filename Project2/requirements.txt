@@ -17,3 +17,6 @@ tiktoken
 faiss-cpu
 chromadb
 jinja2
+beautifulsoup4
+lxml
+html5lib

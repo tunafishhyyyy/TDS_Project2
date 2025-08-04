@@ -691,14 +691,18 @@ Output Format: {output_format}
 Special Instructions: {special_instructions}
 
 Provide a complete solution that:
-1. Scrapes the data from the specified URL
+1. Scrapes the data from the specified URL using pandas read_html (preferred) or requests
 2. Cleans and processes the data (remove footnotes, convert to numeric, etc.)
 3. Creates visualizations as requested
 4. Performs analysis to answer specific questions
 5. Returns the final answers
 
-IMPORTANT: Generate executable Python code that actually performs these tasks, not just a plan.
-Include all necessary imports and error handling.
+IMPORTANT: 
+- Generate executable Python code that actually performs these tasks, not just a plan
+- Use pandas read_html() for web scraping when possible (it's more reliable)
+- Include all necessary imports and error handling
+- Make sure the code can run without external dependencies like BeautifulSoup
+- Print the final answers clearly
 """
         
         return ChatPromptTemplate.from_messages([
@@ -807,26 +811,54 @@ Include all necessary imports and error handling.
     async def _safe_execute_code_block(self, code: str, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """Safely execute a code block"""
         try:
-            # Create a safe execution environment
-            exec_globals = {
-                'pd': pd,
-                'requests': __import__('requests'),
-                'BeautifulSoup': __import__('bs4').BeautifulSoup,
-                'matplotlib': __import__('matplotlib'),
-                'plt': __import__('matplotlib.pyplot'),
-                'json': json,
-                'datetime': datetime,
-                'logging': logging
-            }
+            # Create a safe execution environment with proper imports
+            exec_globals = {}
+            
+            # Import required modules safely
+            try:
+                exec_globals['pd'] = pd
+                exec_globals['requests'] = __import__('requests')
+                exec_globals['matplotlib'] = __import__('matplotlib')
+                exec_globals['plt'] = __import__('matplotlib.pyplot')
+                exec_globals['json'] = json
+                exec_globals['datetime'] = datetime
+                exec_globals['logging'] = logging
+                
+                # Try to import BeautifulSoup, fallback if not available
+                try:
+                    exec_globals['BeautifulSoup'] = __import__('bs4').BeautifulSoup
+                except ImportError:
+                    logger.warning("BeautifulSoup not available, using alternative approach")
+                    # Use pandas read_html as alternative
+                    exec_globals['BeautifulSoup'] = None
+                
+                # Import additional useful modules
+                try:
+                    exec_globals['numpy'] = __import__('numpy')
+                    exec_globals['np'] = exec_globals['numpy']
+                except ImportError:
+                    pass
+                
+            except ImportError as e:
+                logger.error(f"Failed to import required module: {e}")
+                return {
+                    "status": "error",
+                    "error": f"Missing dependency: {e}",
+                    "code_attempted": code[:200] + "..." if len(code) > 200 else code
+                }
             
             # Execute the code
             exec(code, exec_globals)
             
             # Try to capture any output variables
             output_vars = {}
-            for var_name in ['df', 'result', 'data', 'top_10_countries', 'rank_5_country', 'total_gdp_top_10']:
+            for var_name in ['df', 'result', 'data', 'top_10_countries', 'rank_5_country', 'total_gdp_top_10', 'fifth_country', 'gdp_data']:
                 if var_name in exec_globals:
-                    output_vars[var_name] = str(exec_globals[var_name])
+                    var_value = exec_globals[var_name]
+                    if hasattr(var_value, 'to_string'):
+                        output_vars[var_name] = var_value.to_string()
+                    else:
+                        output_vars[var_name] = str(var_value)
             
             return {
                 "status": "success",
