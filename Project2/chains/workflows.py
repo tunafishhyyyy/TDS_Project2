@@ -716,6 +716,7 @@ IMPORTANT:
 - Add debug prints to show what data is being processed
 - Handle various data formats and structures automatically
 - Always use dynamic column references instead of hardcoded column names
+- Keep the code simple and avoid complex variable names that might be interpreted as template variables
 
 Example approach:
 ```python
@@ -741,31 +742,13 @@ try:
         print(f"  Sample data:")
         print(table.head(3))
     
-    # Select the most relevant table based on content
-    # Look for the table with the most rows and GDP-related content
-    best_table_idx = 0
-    best_table_score = 0
-    
-    for i, table in enumerate(tables):
-        score = 0
-        # Prefer tables with more rows (more data)
-        if table.shape[0] > 10:
-            score += 10
-        # Prefer tables with more columns (more information)
-        if table.shape[1] > 2:
-            score += 5
-        # Check for GDP-related keywords in column names
-        for col in table.columns:
-            col_str = str(col).lower()
-            if 'gdp' in col_str or 'economy' in col_str or 'country' in col_str:
-                score += 3
-        
-        if score > best_table_score:
-            best_table_score = score
-            best_table_idx = i
-    
-    data = tables[best_table_idx]
-    print(f"Selected table {best_table_idx} with score {best_table_score}")
+            # Select the most relevant table based on content
+        # Look for the table with the most rows (usually the main data table)
+        data = tables[0]  # Start with first table
+        for i, table in enumerate(tables):
+            if table.shape[0] > data.shape[0]:  # Pick table with most rows
+                data = table
+        print(f"Selected table with {{data.shape[0]}} rows and {{data.shape[1]}} columns")
     
 except Exception as e:
     print(f"pandas read_html failed: {{e}}")
