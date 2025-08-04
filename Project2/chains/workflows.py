@@ -230,7 +230,7 @@ df_sample = pd.DataFrame(sample_data)
                 "execution_status": "failed",
                 "error": str(e),
                 "error_type": type(e).__name__
-            }
+                        }
     
     def _create_eda_prompt(self) -> ChatPromptTemplate:
         """Create EDA-specific prompt"""
