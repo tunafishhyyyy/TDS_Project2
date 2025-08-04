@@ -723,19 +723,19 @@ import numpy as np
 
 # Step 1: Web scraping and data extraction
 url = "your_url_here"
-print(f"Scraping data from: {url}")
+print(f"Scraping data from: {{url}}")
 
 # Try different scraping methods
 try:
     # Method 1: pandas read_html (works for tables)
     tables = pd.read_html(url)
-    print(f"Found {len(tables)} tables on the page")
+    print(f"Found {{len(tables)}} tables on the page")
     
     # Inspect all tables to understand the data structure
     for i, table in enumerate(tables):
-        print(f"\\nTable {i}:")
-        print(f"  Shape: {table.shape}")
-        print(f"  Columns: {table.columns.tolist()}")
+        print(f"\\nTable {{i}}:")
+        print(f"  Shape: {{table.shape}}")
+        print(f"  Columns: {{table.columns.tolist()}}")
         print(f"  Sample data:")
         print(table.head(3))
     
@@ -744,7 +744,7 @@ try:
     data = tables[0]  # Start with first table, adjust as needed
     
 except Exception as e:
-    print(f"pandas read_html failed: {e}")
+    print(f"pandas read_html failed: {{e}}")
     # Method 2: requests + BeautifulSoup (if available)
     try:
         import requests
@@ -755,18 +755,18 @@ except Exception as e:
         
         # Find tables
         tables = soup.find_all('table')
-        print(f"Found {len(tables)} tables using BeautifulSoup")
+        print(f"Found {{len(tables)}} tables using BeautifulSoup")
         
         # Convert to pandas DataFrame
         data = pd.read_html(str(tables[0]))[0]
         
     except Exception as e2:
-        print(f"BeautifulSoup also failed: {e2}")
+        print(f"BeautifulSoup also failed: {{e2}}")
         raise Exception("Could not scrape data from the URL")
 
 # Step 2: Data inspection and cleaning
-print(f"\\nSelected data shape: {data.shape}")
-print(f"Columns: {data.columns.tolist()}")
+print(f"\\nSelected data shape: {{data.shape}}")
+print(f"Columns: {{data.columns.tolist()}}")
 print("\\nFirst few rows:")
 print(data.head())
 
@@ -777,7 +777,7 @@ if data.iloc[0].dtype == 'object':
     data.columns = data.iloc[0]
     data = data[1:].reset_index(drop=True)
     print("\\nAfter setting headers:")
-    print(f"Columns: {data.columns.tolist()}")
+    print(f"Columns: {{data.columns.tolist()}}")
 
 # Clean numeric columns (remove symbols, convert to numeric)
 for col in data.columns:
@@ -792,26 +792,26 @@ print(data.head())
 # Step 3: Data analysis
 # Find numeric columns for analysis
 numeric_cols = data.select_dtypes(include=[np.number]).columns.tolist()
-print(f"\\nNumeric columns available: {numeric_cols}")
+print(f"\\nNumeric columns available: {{numeric_cols}}")
 
 if len(numeric_cols) > 0:
     # Use the first numeric column for analysis
     analysis_col = numeric_cols[0]
-    print(f"Using column '{analysis_col}' for analysis")
+    print(f"Using column '{{analysis_col}}' for analysis")
     
     # Sort by the analysis column
     data_sorted = data.sort_values(analysis_col, ascending=False)
     
     # Get top 10 items
     top_10 = data_sorted.head(10)
-    print(f"\\nTop 10 by {analysis_col}:")
+    print(f"\\nTop 10 by {{analysis_col}}:")
     print(top_10[[data.columns[0], analysis_col]])  # Show first column and analysis column
     
     # Step 4: Visualization
     plt.figure(figsize=(12, 6))
     plt.bar(range(len(top_10)), top_10[analysis_col])
     plt.xticks(range(len(top_10)), top_10[data.columns[0]], rotation=45)
-    plt.title(f'Top 10 by {analysis_col}')
+    plt.title(f'Top 10 by {{analysis_col}}')
     plt.xlabel(data.columns[0])
     plt.ylabel(analysis_col)
     plt.tight_layout()
@@ -823,8 +823,8 @@ if len(numeric_cols) > 0:
         total_top_10 = top_10[analysis_col].sum()
         
         print(f"\\nANSWERS:")
-        print(f"Item ranking 5th by {analysis_col}: {fifth_item}")
-        print(f"Total {analysis_col} of top 10: {total_top_10}")
+        print(f"Item ranking 5th by {{analysis_col}}: {{fifth_item}}")
+        print(f"Total {{analysis_col}} of top 10: {{total_top_10}}")
     else:
         print(f"\\nNot enough data for ranking analysis")
 else:
