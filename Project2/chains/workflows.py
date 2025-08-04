@@ -717,6 +717,9 @@ IMPORTANT:
 - Handle various data formats and structures automatically
 - Always use dynamic column references instead of hardcoded column names
 - Keep the code simple and avoid complex variable names that might be interpreted as template variables
+- CRITICAL: After cleaning data, use data.select_dtypes(include=[np.number]).columns.tolist() to find numeric columns
+- CRITICAL: Never assume data.columns[1] is a column name - it might be a value
+- CRITICAL: Always verify column types before using them for analysis
 
 Example approach:
 ```python
@@ -808,7 +811,7 @@ print("\\nAfter cleaning:")
 print(data.head())
 
 # Step 3: Data analysis
-# Find numeric columns for analysis
+# Find numeric columns for analysis - CRITICAL: Use select_dtypes to find numeric columns
 numeric_cols = data.select_dtypes(include=[np.number]).columns.tolist()
 print(f"\\nNumeric columns available: {{numeric_cols}}")
 
@@ -817,17 +820,21 @@ if len(numeric_cols) > 0:
     analysis_col = numeric_cols[0]
     print(f"Using column '{{analysis_col}}' for analysis")
     
-    # Remove rows with NaN values in the analysis column
-    data_clean = data.dropna(subset=[analysis_col])
-    print(f"After removing NaN values: {{data_clean.shape[0]}} rows")
-    
-    # Sort by the analysis column
-    data_sorted = data_clean.sort_values(analysis_col, ascending=False)
-    
-    # Get top 10 items
-    top_10 = data_sorted.head(10)
-    print(f"\\nTop 10 by {{analysis_col}}:")
-    print(top_10[[data.columns[0], analysis_col]])  # Show first column and analysis column
+    # Verify the column exists and is numeric
+    if analysis_col in data.columns:
+        print(f"Column '{{analysis_col}}' found in data")
+        
+        # Remove rows with NaN values in the analysis column
+        data_clean = data.dropna(subset=[analysis_col])
+        print(f"After removing NaN values: {{data_clean.shape[0]}} rows")
+        
+        # Sort by the analysis column
+        data_sorted = data_clean.sort_values(analysis_col, ascending=False)
+        
+        # Get top 10 items
+        top_10 = data_sorted.head(10)
+        print(f"\\nTop 10 by {{analysis_col}}:")
+        print(top_10[[data.columns[0], analysis_col]])  # Show first column and analysis column
     
     # Step 4: Visualization
     plt.figure(figsize=(12, 6))
