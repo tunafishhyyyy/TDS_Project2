@@ -21,17 +21,7 @@ class ExploratoryDataAnalysisWorkflow(BaseWorkflow):
         self.prompt_template = self._create_eda_prompt()
         self.chain = LLMChain(llm=self.llm, prompt=self.prompt_template)
 
-                "timestamp": datetime.now().isoformat(),
-                "text_length": len(text_content)
-            }
-        except Exception as e:
-            logger.error(f"Error in TextAnalysisWorkflow: {e}")
-            return {
-                "error": str(e), 
-                "workflow_type": "text_analysis", 
-                "status": "error", 
-                "timestamp": datetime.now().isoformat()
-            }
+
 
 class DataAnalysisWorkflow(BaseWorkflow):
     """Generalized workflow for data analysis tasks"""
