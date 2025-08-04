@@ -720,6 +720,8 @@ IMPORTANT:
 - CRITICAL: After cleaning data, use data.select_dtypes(include=[np.number]).columns.tolist() to find numeric columns
 - CRITICAL: Never assume data.columns[1] is a column name - it might be a value
 - CRITICAL: Always verify column types before using them for analysis
+- CRITICAL: For Wikipedia GDP data, the main table is usually the one with the most rows (200+ rows)
+- CRITICAL: Always print table information to verify you're selecting the right table
 
 Example approach:
 ```python
@@ -748,10 +750,18 @@ try:
             # Select the most relevant table based on content
         # Look for the table with the most rows (usually the main data table)
         data = tables[0]  # Start with first table
+        max_rows = 0
+        best_table_idx = 0
+        
         for i, table in enumerate(tables):
-            if table.shape[0] > data.shape[0]:  # Pick table with most rows
+            print(f"Table {{i}}: {{table.shape[0]}} rows, {{table.shape[1]}} columns")
+            if table.shape[0] > max_rows:
+                max_rows = table.shape[0]
+                best_table_idx = i
                 data = table
-        print(f"Selected table with {{data.shape[0]}} rows and {{data.shape[1]}} columns")
+        
+        print(f"Selected table {{best_table_idx}} with {{data.shape[0]}} rows and {{data.shape[1]}} columns")
+        print(f"This should be the main data table with the most rows")
     
 except Exception as e:
     print(f"pandas read_html failed: {{e}}")
