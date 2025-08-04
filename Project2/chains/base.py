@@ -15,7 +15,7 @@ from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain.chains.retrieval import create_retrieval_chain
 from langchain_community.vectorstores import Chroma, FAISS
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.document_loaders import TextLoader, CSVLoader
+from langchain_community.document_loaders import TextLoader, CSVLoader
 import pandas as pd
 import json
 from datetime import datetime
@@ -85,8 +85,6 @@ class BaseWorkflow(ABC):
 class DataAnalysisChain(Chain, BaseWorkflow):
     """Chain for data analysis tasks"""
     
-    input_keys: List[str] = ["task_description", "data_context", "parameters"]
-    output_keys: List[str] = ["analysis_result", "recommendations", "metadata"]
     
     def __init__(self, model_name: str = DEFAULT_MODEL, temperature: float = TEMPERATURE, **kwargs):
         BaseWorkflow.__init__(self, model_name=model_name, temperature=temperature, **kwargs)
