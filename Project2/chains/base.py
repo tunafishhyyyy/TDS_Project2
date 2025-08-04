@@ -49,23 +49,23 @@ class BaseWorkflow(ABC):
     def _setup_components(self):
         """Initialize LLM and other components"""
         try:
-            self.llm = ChatOpenAI(
+            object.__setattr__(self, 'llm', ChatOpenAI(
                 model=self.model_name,
                 temperature=self.temperature,
                 max_tokens=MAX_TOKENS,
                 api_key=OPENAI_API_KEY
-            )
+            ))
             
-            self.embeddings = OpenAIEmbeddings(
+            object.__setattr__(self, 'embeddings', OpenAIEmbeddings(
                 model=EMBEDDING_MODEL,
                 api_key=OPENAI_API_KEY
-            )
+            ))
             
             # Setup memory
-            self.memory = ConversationBufferWindowMemory(
+            object.__setattr__(self, 'memory', ConversationBufferWindowMemory(
                 k=10,  # Keep last 10 interactions
                 return_messages=True
-            )
+            ))
             
             logger.info(f"Initialized {self.__class__.__name__} with model {self.model_name}")
             
