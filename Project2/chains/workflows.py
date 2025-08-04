@@ -20,14 +20,6 @@ class ExploratoryDataAnalysisWorkflow(BaseWorkflow):
         super().__init__(**kwargs)
         self.prompt_template = self._create_eda_prompt()
         self.chain = LLMChain(llm=self.llm, prompt=self.prompt_template)
-import logging
-from typing import Dict, Any, List, Optional
-from datetime import datetime
-from .base import BaseWorkflow, WorkflowOrchestrator
-from langchain.chains import LLMChain
-from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
-
-logger = logging.getLogger(__name__)
 
                 "timestamp": datetime.now().isoformat(),
                 "text_length": len(text_content)
