@@ -4,20 +4,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Data Analysis API - File Upload Test</title>
+    <title>Data Analysis API - Multiple File Upload Test</title>
     <style>
         body {
             font-family: Arial, sans-serif;
             max-width: 800px;
-            margin: 50px auto;
+            margin: 0 auto;
             padding: 20px;
             background-color: #f5f5f5;
         }
 
         .container {
-            background: white;
+            background-color: white;
             padding: 30px;
-            border-radius: 8px;
+            border-radius: 10px;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
         }
 
@@ -38,14 +38,78 @@
         }
 
         input[type="file"],
-        input[type="text"],
         textarea,
         select {
             width: 100%;
             padding: 10px;
             border: 1px solid #ddd;
-            border-radius: 4px;
+            border-radius: 5px;
             font-size: 14px;
+        }
+
+        textarea {
+            height: 100px;
+            resize: vertical;
+        }
+
+        .file-info {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .submit-btn {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+        }
+
+        .submit-btn:hover {
+            background-color: #0056b3;
+        }
+
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+        }
+
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+
+        .processing {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .info-box {
+            background-color: #e3f2fd;
+            border: 1px solid #90caf9;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
         }
 
         textarea {
@@ -112,43 +176,31 @@
         <h1>Data Analysis API - File Upload Test</h1>
 
         <div class="example">
-            <h3>Example Usage</h3>
-            <p>This interface matches the API requirement to accept file uploads, such as:</p>
-            <code>curl "https://app.example.com/api/" -F "file=@question.txt"</code>
+            <h3>API v2.0 Requirements</h3>
+            <p>This interface tests the new API that requires:</p>
+            <ul>
+                <li><strong>questions.txt</strong> - Required file containing the analysis questions</li>
+                <li><strong>Additional files</strong> - Optional files like CSV, images, etc.</li>
+                <li><strong>Synchronous processing</strong> - All requests return results immediately</li>
+            </ul>
+            <code>curl "http://localhost:8000/api/" -F "questions_txt=@questions.txt" -F "files=@data.csv"</code>
         </div>
 
         <form id="uploadForm">
             <div class="form-group">
-                <label for="file">Upload File (Optional)</label>
-                <input type="file" id="file" name="file" accept=".txt,.csv,.json">
-                <small>Supported formats: .txt, .csv, .json</small>
+                <label for="questions_txt">Questions File (Required)</label>
+                <input type="file" id="questions_txt" name="questions_txt" accept=".txt" required>
+                <small class="file-info">Required: Must be a .txt file containing your analysis questions (filename must
+                    contain 'question')</small>
             </div>
 
             <div class="form-group">
-                <label for="task_description">Task Description (Optional if file provided)</label>
-                <textarea id="task_description" name="task_description"
-                    placeholder="Describe your analysis task..."></textarea>
+                <label for="files">Additional Files (Optional)</label>
+                <input type="file" id="files" name="files" multiple accept=".txt,.csv,.json,.png,.jpg,.jpeg">
+                <small class="file-info">Optional: Upload additional data files (CSV, images, JSON, etc.)</small>
             </div>
 
-            <div class="form-group">
-                <label for="workflow_type">Workflow Type</label>
-                <select id="workflow_type" name="workflow_type">
-                    <option value="data_analysis">Data Analysis</option>
-                    <option value="exploratory_data_analysis">Exploratory Data Analysis</option>
-                    <option value="predictive_modeling">Predictive Modeling</option>
-                    <option value="data_visualization">Data Visualization</option>
-                    <option value="code_generation">Code Generation</option>
-                    <option value="report_generation">Report Generation</option>
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label for="business_context">Business Context (Optional)</label>
-                <textarea id="business_context" name="business_context"
-                    placeholder="Additional context about your business or use case..."></textarea>
-            </div>
-
-            <button type="submit">Submit Analysis Request</button>
+            <button type="submit" class="submit-btn">Submit Analysis Request</button>
         </form>
 
         <div id="result" class="result"></div>
@@ -156,14 +208,11 @@
         <div class="example">
             <h3>Testing with curl</h3>
             <p>You can also test the API directly with curl:</p>
-            <pre><code># File upload
-curl "http://localhost:8000/api/" -F "file=@question.txt"
+            <pre><code># Multiple file upload (new API v2.0)
+curl "http://localhost:8000/api/" -F "questions_txt=@questions.txt" -F "files=@data.csv" -F "files=@image.png"
 
-# Form data
-curl "http://localhost:8000/api/" -F "task_description=Analyze sales data"
-
-# Check status
-curl "http://localhost:8000/api/tasks/{task_id}/status"</code></pre>
+# Single questions file only
+curl "http://localhost:8000/api/" -F "questions_txt=@questions.txt"</code></pre>
         </div>
     </div>
 
@@ -174,33 +223,31 @@ curl "http://localhost:8000/api/tasks/{task_id}/status"</code></pre>
             const resultDiv = document.getElementById('result');
             const formData = new FormData();
 
-            // Add form fields to FormData
-            const file = document.getElementById('file').files[0];
-            const taskDescription = document.getElementById('task_description').value;
-            const workflowType = document.getElementById('workflow_type').value;
-            const businessContext = document.getElementById('business_context').value;
+            // Get form fields
+            const questionsFile = document.getElementById('questions_txt').files[0];
+            const additionalFiles = document.getElementById('files').files;
 
-            if (file) {
-                formData.append('file', file);
-            }
-            if (taskDescription) {
-                formData.append('task_description', taskDescription);
-            }
-            if (workflowType) {
-                formData.append('workflow_type', workflowType);
-            }
-            if (businessContext) {
-                formData.append('business_context', businessContext);
-            }
-
-            // Validate input
-            if (!file && !taskDescription) {
-                showResult('error', 'Please provide either a file or task description.');
+            // Validate required questions file
+            if (!questionsFile) {
+                showResult('error', 'Please provide a questions.txt file (required).');
                 return;
             }
 
+            // Validate questions file name
+            if (!questionsFile.name.toLowerCase().includes('question') || !questionsFile.name.toLowerCase().endsWith('.txt')) {
+                showResult('error', 'Questions file must be a .txt file with "question" in the filename.');
+                return;
+            }
+
+            // Add files to FormData
+            formData.append('questions_txt', questionsFile);
+
+            for (let i = 0; i < additionalFiles.length; i++) {
+                formData.append('files', additionalFiles[i]);
+            }
+
             // Show loading
-            showResult('loading', 'Submitting request...');
+            showResult('loading', 'Processing request synchronously...');
 
             try {
                 const response = await fetch('/api/', {
@@ -211,13 +258,21 @@ curl "http://localhost:8000/api/tasks/{task_id}/status"</code></pre>
                 const data = await response.json();
 
                 if (response.ok) {
-                    showResult('success', `
-                        <strong>Success!</strong><br>
-                        Task ID: ${data.task_id}<br>
-                        Status: ${data.status}<br>
-                        <br>
-                        <button onclick="checkStatus('${data.task_id}')">Check Status</button>
-                    `);
+                    if (data.status === 'completed') {
+                        showResult('success', `
+                            <strong>Analysis Completed!</strong><br>
+                            Task ID: ${data.task_id}<br>
+                            Workflow: ${data.workflow_type}<br>
+                            Questions File: ${data.processing_info.questions_file}<br>
+                            Additional Files: ${data.processing_info.additional_files.join(', ') || 'None'}<br>
+                            Workflow Auto-detected: ${data.processing_info.workflow_auto_detected}<br>
+                            <br>
+                            <strong>Results:</strong><br>
+                            <pre>${JSON.stringify(data.result, null, 2)}</pre>
+                        `);
+                    } else {
+                        showResult('error', `Unexpected status: ${data.status}`);
+                    }
                 } else {
                     showResult('error', `Error: ${data.detail || 'Unknown error'}`);
                 }
@@ -231,50 +286,6 @@ curl "http://localhost:8000/api/tasks/{task_id}/status"</code></pre>
             resultDiv.className = `result ${type}`;
             resultDiv.innerHTML = message;
             resultDiv.style.display = 'block';
-        }
-
-        async function checkStatus(taskId) {
-            showResult('loading', 'Checking status...');
-
-            try {
-                const response = await fetch(`http://localhost:8000/api/tasks/${taskId}/status`);
-                const data = await response.json();
-
-                if (response.ok) {
-                    let resultHtml = `
-                        <strong>Task Status: ${data.status}</strong><br>
-                        Created: ${data.created_at}<br>
-                    `;
-
-                    if (data.status === 'completed' && data.result) {
-                        resultHtml += `
-                            <br><strong>Analysis Results:</strong><br>
-                            Summary: ${data.result.summary}<br>
-                            <br><strong>Insights:</strong><br>
-                            ${data.result.insights.map(insight => `• ${insight}`).join('<br>')}
-                            <br><br><strong>Recommendations:</strong><br>
-                            ${data.result.recommendations.map(rec => `• ${rec}`).join('<br>')}
-                        `;
-
-                        if (data.result.file_analysis) {
-                            resultHtml += `
-                                <br><br><strong>File Analysis:</strong><br>
-                                File: ${data.result.file_analysis.file_name}<br>
-                                Size: ${data.result.file_analysis.content_length} characters<br>
-                                Preview: ${data.result.file_analysis.content_preview}
-                            `;
-                        }
-                    } else if (data.status === 'processing') {
-                        resultHtml += `<br><button onclick="checkStatus('${taskId}')">Refresh Status</button>`;
-                    }
-
-                    showResult('success', resultHtml);
-                } else {
-                    showResult('error', `Error: ${data.detail || 'Unknown error'}`);
-                }
-            } catch (error) {
-                showResult('error', `Network error: ${error.message}`);
-            }
         }
     </script>
 </body>

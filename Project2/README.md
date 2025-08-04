@@ -1,6 +1,90 @@
-# Data Analysis API with LangChain
+## API Endpoints
 
-A FastAPI-based REST API that uses LangChain to orchestrate LLM workflows for data analysis tasks.
+- `POST /api/` - Submit analysis tasks (multi-file upload, required questions.txt)
+- `GET /health` - Health check
+- `GET /` - API info
+
+### Example Usage
+
+#### Curl (multi-file upload)
+
+```bash
+curl "http://localhost:8000/api/" -F "questions_txt=@questions.txt" -F "files=@data.csv" -F "files=@image.png"
+```
+
+## Available Workflows
+
+- **data_analysis**: General analysis and recommendations
+- **image_analysis**: Image processing and computer vision
+- **text_analysis**: Natural language processing and text analytics
+- **code_generation**: Generate executable Python code
+- **exploratory_data_analysis**: EDA planning and execution
+- **predictive_modeling**: ML model development guidance
+- **data_visualization**: Visualization recommendations
+- **statistical_analysis**: Statistical analysis and correlations
+- **web_scraping**: Web data extraction
+- **database_analysis**: SQL and DuckDB analysis
+
+# Multi-Modal Data Analysis API v2.0
+
+A FastAPI-based REST API that uses LangChain to orchestrate LLM workflows for comprehensive data analysis tasks with multi-modal support.
+
+## 🚀 New Features (v2.0)
+
+- **Multiple File Upload**: Required `questions.txt` + optional additional files (CSV, images, etc.)
+- **Synchronous Processing**: Get results immediately (≤3 minutes)
+- **LLM-Based Workflow Detection**: Intelligent workflow classification using AI
+- **Multi-Modal Analysis**: Support for text, images, and code generation
+- **Enhanced Logging**: Comprehensive logging throughout the execution flow
+- **10+ Generalized Workflows**: Including image analysis, text analysis, and code generation
+
+## 📋 Requirements
+
+The API now enforces that:
+
+- `questions.txt` file is **ALWAYS** required and must contain the analysis questions
+- Zero or more additional files can be uploaded (images, CSV, JSON, etc.)
+- All processing is synchronous (≤3 minutes)
+- All generated code is executable Python with proper error handling
+
+## 🛠️ Available Workflows
+
+1. **data_analysis** - General data analysis and recommendations
+2. **image_analysis** - Image processing and computer vision
+3. **text_analysis** - Natural language processing and text analytics
+4. **code_generation** - Generate executable Python code
+5. **exploratory_data_analysis** - Comprehensive EDA planning
+6. **predictive_modeling** - Machine learning model development
+7. **data_visualization** - Chart and graph generation
+8. **statistical_analysis** - Statistical analysis and correlations
+9. **web_scraping** - Web data extraction
+10. **database_analysis** - SQL and DuckDB analysis
+
+## 🌐 API Endpoints
+
+### Main Endpoint
+
+```bash
+POST /api/
+```
+
+**Required**: `questions.txt` file containing analysis questions
+**Optional**: Additional files (images, CSV, JSON, etc.)
+
+Example:
+
+```bash
+curl "http://localhost:8000/api/" \
+  -F "questions_txt=@questions.txt" \
+  -F "files=@data.csv" \
+  -F "files=@image.png"
+```
+
+### Health Check
+
+```bash
+GET /health
+```
 
 ## VM Setup & Installation (Linux)
 
@@ -25,7 +109,6 @@ sudo usermod -aG docker $USER
 # You may need to log out and log back in for group changes to take effect
 
 # Clone the public repository
-# Replace <your-repo-url> with the actual repo URL
 git clone https://github.com/tunafishhyyyy/TDS_Project2.git
 cd TDS_Project2/Project2
 
