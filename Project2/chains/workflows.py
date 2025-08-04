@@ -7,7 +7,7 @@ import pandas as pd
 import json
 from datetime import datetime
 import logging
-from .base import BaseWorkflow, WorkflowOrchestrator
+from chains.base import BaseWorkflow, WorkflowOrchestrator
 from langchain.chains import LLMChain
 from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
 

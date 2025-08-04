@@ -14,6 +14,14 @@ import re
 import logging
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from config import API_VERSION, TIMEOUT
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'chains'))
 try:
     from workflows import AdvancedWorkflowOrchestrator
@@ -22,15 +30,6 @@ try:
 except ImportError as e:
     logger.warning(f"Could not import workflows: {e}")
     orchestrator = None
-
-from fastapi.staticfiles import StaticFiles
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Data Analysis API",
