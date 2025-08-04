@@ -707,13 +707,15 @@ IMPORTANT:
 - Generate executable Python code that actually performs these tasks, not just a plan
 - Use pandas read_html() for web scraping when possible (it's more reliable)
 - ALWAYS inspect the actual data structure first (print column names, data types, first few rows)
-- Handle dynamic column names - don't assume specific column names exist
+- Handle dynamic column names - NEVER assume specific column names like 'Country/Territory' exist
+- Use data.columns[0] for the first column, data.columns[1] for second, etc.
 - Make the code generic enough to work with different types of data (not just GDP data)
 - Include all necessary imports and error handling
 - Make sure the code can run without external dependencies like BeautifulSoup
 - Print the final answers clearly
 - Add debug prints to show what data is being processed
 - Handle various data formats and structures automatically
+- Always use dynamic column references instead of hardcoded column names
 
 Example approach:
 ```python
@@ -819,17 +821,23 @@ if len(numeric_cols) > 0:
     
     # Step 5: Answer specific questions
     if len(top_10) >= 5:
-        fifth_item = top_10.iloc[4][data.columns[0]]
+        # Use dynamic column names - don't assume specific names
+        first_col = data.columns[0]  # First column (usually country/territory name)
+        fifth_item = top_10.iloc[4][first_col]
         total_top_10 = top_10[analysis_col].sum()
         
         print(f"\\nANSWERS:")
         print(f"Item ranking 5th by {{analysis_col}}: {{fifth_item}}")
         print(f"Total {{analysis_col}} of top 10: {{total_top_10}}")
+        
+        # Also print the full top 10 for reference
+        print(f"\\nFull top 10 list:")
+        for i, (idx, row) in enumerate(top_10.iterrows()):
+            print(f"{{i+1}}. {{row[first_col]}}: {{row[analysis_col]}}")
     else:
         print(f"\\nNot enough data for ranking analysis")
 else:
     print("\\nNo numeric columns found for analysis")
-```
 """
         
         return ChatPromptTemplate.from_messages([
