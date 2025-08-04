@@ -86,6 +86,9 @@ class DataAnalysisChain(Chain, BaseWorkflow):
     """Chain for data analysis tasks"""
     
     
+    # Define required abstract attributes to allow instantiation
+    input_keys: List[str] = ["task_description", "data_context", "parameters"]
+    output_keys: List[str] = ["analysis_result", "recommendations", "metadata"]
     def __init__(self, model_name: str = DEFAULT_MODEL, temperature: float = TEMPERATURE, **kwargs):
         BaseWorkflow.__init__(self, model_name=model_name, temperature=temperature, **kwargs)
         Chain.__init__(self)
