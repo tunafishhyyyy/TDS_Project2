@@ -18,81 +18,33 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-async def test_multi_step_workflow():
-    """Test the multi-step web scraping workflow"""
-    
-    # Read the questions.txt file
-    with open('questions.txt', 'r', encoding='utf-8') as f:
-        questions_text = f.read()
-    
-    logger.info(f"Testing with questions: {questions_text[:200]}...")
-    
-    # Initialize the orchestrator
-    orchestrator = AdvancedWorkflowOrchestrator()
-    
-    # Prepare workflow input
-    workflow_input = {
-        "task_description": questions_text,
-        "questions": questions_text,
-        "additional_files": {},
-        "processed_files_info": {},
-        "workflow_type": "multi_step_web_scraping",
-        "parameters": {
-            "data_requirements": "Extract table data and perform analysis",
-            "output_format": "structured data with visualizations",
-            "special_instructions": "Execute all steps and provide final answers"
-        },
-        "output_requirements": {
-            "format": "structured",
-            "include_visualizations": True,
-            "answer_questions": True
-        }
-    }
-    
-    logger.info("Starting multi-step web scraping workflow test")
-    
-    try:
-        # Execute the workflow
-        result = await orchestrator.execute_workflow("multi_step_web_scraping", workflow_input)
-        
-        logger.info("Workflow execution completed")
-        logger.info(f"Result type: {type(result)}")
-        
-        if isinstance(result, dict):
-            logger.info(f"Result keys: {list(result.keys())}")
-            
-            # Print key results
-            if "scraping_plan" in result:
-                logger.info("Scraping plan generated")
-                print("\n=== SCRAPING PLAN ===")
-                print(result["scraping_plan"][:500] + "..." if len(result["scraping_plan"]) > 500 else result["scraping_plan"])
-            
-            if "execution_result" in result:
-                logger.info("Execution results available")
-                print("\n=== EXECUTION RESULTS ===")
-                print(f"Total code blocks: {result['execution_result'].get('total_blocks', 0)}")
-                print(f"Successful blocks: {result['execution_result'].get('successful_blocks', 0)}")
-                
-                if "execution_results" in result["execution_result"]:
-                    for i, exec_result in enumerate(result["execution_result"]["execution_results"]):
-                        print(f"\nBlock {i+1}: {exec_result['status']}")
-                        if exec_result['status'] == 'success' and 'result' in exec_result:
-                            if 'output_variables' in exec_result['result']:
-                                for var_name, var_value in exec_result['result']['output_variables'].items():
-                                    print(f"  {var_name}: {var_value[:100]}...")
-            
-            if "steps_executed" in result:
-                print(f"\n=== STEPS EXECUTED ===")
-                for step in result["steps_executed"]:
-                    print(f"  ✓ {step}")
-        
-        return result
-        
-    except Exception as e:
-        logger.error(f"Error in workflow execution: {e}")
-        import traceback
-        logger.error(f"Traceback: {traceback.format_exc()}")
-        raise
+# --- Mock LLM for demo purposes ---
+def mock_llm(prompt):
+    # Always return the hardcoded plan for GDP scraping
+    return '''[
+      {"step": "scrape_table", "url": "https://en.wikipedia.org/wiki/List_of_countries_by_GDP_(nominal)"},
+      {"step": "inspect_table"},
+      {"step": "clean_data"},
+      {"step": "analyze_data", "top_n": 10},
+      {"step": "visualize"},
+      {"step": "answer", "questions": [
+        "Which country ranks 5th by GDP?",
+        "What is the total GDP of the top 10 countries?"
+      ]}
+    ]'''
 
-if __name__ == "__main__":
-    asyncio.run(test_multi_step_workflow()) 
+if __name__ == '__main__':
+    # Read the user request from questions.txt
+    questions_path = os.path.join(os.path.dirname(__file__), 'questions.txt')
+    with open(questions_path, 'r') as f:
+        user_request = f.read()
+
+    # Use the mock LLM for demo/testing
+    result = run_llm_planned_workflow(user_request, llm=mock_llm)
+    print("\n--- LLM-driven Modular Workflow Result ---")
+    print(result)
+
+    # --- To use a real LLM, replace mock_llm with your LLM instance ---
+    # from your_llm_module import my_llm
+    # result = run_llm_planned_workflow(user_request, llm=my_llm)
+    # print(result) 
