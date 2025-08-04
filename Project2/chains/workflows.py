@@ -675,12 +675,17 @@ class MultiStepWebScrapingWorkflow(BaseWorkflow):
         """Create multi-step web scraping prompt"""
         system_message = """You are a web scraping expert specializing in multi-step data analysis tasks.
 Your task is to execute complete web scraping workflows including:
-1. Web scraping and data extraction
-2. Data cleaning and preprocessing
+1. Web scraping and data extraction from any website
+2. Data cleaning and preprocessing (handling various data formats)
 3. Data analysis and visualization
 4. Answering specific questions about the data
 
 You must provide executable Python code that actually performs these tasks.
+IMPORTANT: 
+- Always inspect the actual data structure before processing
+- Handle dynamic column names and various data formats
+- Make the code generic enough to work with different types of data
+- Include proper error handling for different scenarios
 """
         
         human_message = """
@@ -692,17 +697,139 @@ Special Instructions: {special_instructions}
 
 Provide a complete solution that:
 1. Scrapes the data from the specified URL using pandas read_html (preferred) or requests
-2. Cleans and processes the data (remove footnotes, convert to numeric, etc.)
-3. Creates visualizations as requested
-4. Performs analysis to answer specific questions
-5. Returns the final answers
+2. Inspects the actual data structure and column names before processing
+3. Cleans and processes the data (remove symbols, convert to numeric, handle various formats)
+4. Creates visualizations as requested
+5. Performs analysis to answer specific questions
+6. Returns the final answers
 
 IMPORTANT: 
 - Generate executable Python code that actually performs these tasks, not just a plan
 - Use pandas read_html() for web scraping when possible (it's more reliable)
+- ALWAYS inspect the actual data structure first (print column names, data types, first few rows)
+- Handle dynamic column names - don't assume specific column names exist
+- Make the code generic enough to work with different types of data (not just GDP data)
 - Include all necessary imports and error handling
 - Make sure the code can run without external dependencies like BeautifulSoup
 - Print the final answers clearly
+- Add debug prints to show what data is being processed
+- Handle various data formats and structures automatically
+
+Example approach:
+```python
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+
+# Step 1: Web scraping and data extraction
+url = "your_url_here"
+print(f"Scraping data from: {url}")
+
+# Try different scraping methods
+try:
+    # Method 1: pandas read_html (works for tables)
+    tables = pd.read_html(url)
+    print(f"Found {len(tables)} tables on the page")
+    
+    # Inspect all tables to understand the data structure
+    for i, table in enumerate(tables):
+        print(f"\\nTable {i}:")
+        print(f"  Shape: {table.shape}")
+        print(f"  Columns: {table.columns.tolist()}")
+        print(f"  Sample data:")
+        print(table.head(3))
+    
+    # Select the most relevant table based on content
+    # You can modify this logic based on what you're looking for
+    data = tables[0]  # Start with first table, adjust as needed
+    
+except Exception as e:
+    print(f"pandas read_html failed: {e}")
+    # Method 2: requests + BeautifulSoup (if available)
+    try:
+        import requests
+        from bs4 import BeautifulSoup
+        
+        response = requests.get(url)
+        soup = BeautifulSoup(response.content, 'html.parser')
+        
+        # Find tables
+        tables = soup.find_all('table')
+        print(f"Found {len(tables)} tables using BeautifulSoup")
+        
+        # Convert to pandas DataFrame
+        data = pd.read_html(str(tables[0]))[0]
+        
+    except Exception as e2:
+        print(f"BeautifulSoup also failed: {e2}")
+        raise Exception("Could not scrape data from the URL")
+
+# Step 2: Data inspection and cleaning
+print(f"\\nSelected data shape: {data.shape}")
+print(f"Columns: {data.columns.tolist()}")
+print("\\nFirst few rows:")
+print(data.head())
+
+# Clean the data structure
+# Check if first row contains headers
+if data.iloc[0].dtype == 'object':
+    # Use first row as headers
+    data.columns = data.iloc[0]
+    data = data[1:].reset_index(drop=True)
+    print("\\nAfter setting headers:")
+    print(f"Columns: {data.columns.tolist()}")
+
+# Clean numeric columns (remove symbols, convert to numeric)
+for col in data.columns:
+    if data[col].dtype == 'object':
+        # Try to convert to numeric, removing common symbols
+        cleaned = data[col].astype(str).str.replace('$', '').str.replace(',', '').str.replace('€', '').str.replace('£', '')
+        data[col] = pd.to_numeric(cleaned, errors='coerce')
+
+print("\\nAfter cleaning:")
+print(data.head())
+
+# Step 3: Data analysis
+# Find numeric columns for analysis
+numeric_cols = data.select_dtypes(include=[np.number]).columns.tolist()
+print(f"\\nNumeric columns available: {numeric_cols}")
+
+if len(numeric_cols) > 0:
+    # Use the first numeric column for analysis
+    analysis_col = numeric_cols[0]
+    print(f"Using column '{analysis_col}' for analysis")
+    
+    # Sort by the analysis column
+    data_sorted = data.sort_values(analysis_col, ascending=False)
+    
+    # Get top 10 items
+    top_10 = data_sorted.head(10)
+    print(f"\\nTop 10 by {analysis_col}:")
+    print(top_10[[data.columns[0], analysis_col]])  # Show first column and analysis column
+    
+    # Step 4: Visualization
+    plt.figure(figsize=(12, 6))
+    plt.bar(range(len(top_10)), top_10[analysis_col])
+    plt.xticks(range(len(top_10)), top_10[data.columns[0]], rotation=45)
+    plt.title(f'Top 10 by {analysis_col}')
+    plt.xlabel(data.columns[0])
+    plt.ylabel(analysis_col)
+    plt.tight_layout()
+    plt.show()
+    
+    # Step 5: Answer specific questions
+    if len(top_10) >= 5:
+        fifth_item = top_10.iloc[4][data.columns[0]]
+        total_top_10 = top_10[analysis_col].sum()
+        
+        print(f"\\nANSWERS:")
+        print(f"Item ranking 5th by {analysis_col}: {fifth_item}")
+        print(f"Total {analysis_col} of top 10: {total_top_10}")
+    else:
+        print(f"\\nNot enough data for ranking analysis")
+else:
+    print("\\nNo numeric columns found for analysis")
+```
 """
         
         return ChatPromptTemplate.from_messages([
@@ -852,11 +979,15 @@ IMPORTANT:
             
             # Try to capture any output variables
             output_vars = {}
-            for var_name in ['df', 'result', 'data', 'top_10_countries', 'rank_5_country', 'total_gdp_top_10', 'fifth_country', 'gdp_data']:
+            for var_name in ['df', 'result', 'data', 'top_10_countries', 'rank_5_country', 'total_gdp_top_10', 'fifth_country', 'gdp_data', 'tables', 'gdp_column']:
                 if var_name in exec_globals:
                     var_value = exec_globals[var_name]
                     if hasattr(var_value, 'to_string'):
                         output_vars[var_name] = var_value.to_string()
+                    elif hasattr(var_value, 'shape'):
+                        output_vars[var_name] = f"DataFrame shape: {var_value.shape}, columns: {list(var_value.columns)}"
+                    elif hasattr(var_value, '__len__') and len(var_value) > 0:
+                        output_vars[var_name] = f"List/Array with {len(var_value)} items: {str(var_value)[:200]}..."
                     else:
                         output_vars[var_name] = str(var_value)
             

@@ -110,13 +110,21 @@ These scripts test the multi-step workflow with the questions.txt file and provi
 With these fixes, when you submit the questions.txt file:
 
 1. **Workflow Detection**: The system will detect `multi_step_web_scraping` workflow
-2. **Code Generation**: The LLM will generate executable Python code
-3. **Execution**: The code will be safely executed
+2. **Code Generation**: The LLM will generate executable Python code with dynamic column handling
+3. **Execution**: The code will be safely executed with proper error handling and data inspection
 4. **Results**: You'll get actual results including:
-   - Scraped data
-   - Cleaned data
-   - Visualizations
-   - Answers to specific questions
+   - Scraped data from Wikipedia
+   - Cleaned and processed data
+   - Visualizations (bar charts)
+   - Answers to specific questions (5th ranked country, total GDP)
+
+### Key Improvements in Latest Version:
+- **Generic Approach**: Code works with any type of data, not just GDP-specific
+- **Dynamic Column Detection**: Code inspects actual data structure before processing
+- **Robust Error Handling**: Better handling of missing columns and data issues
+- **Debug Output**: Detailed logging of data processing steps
+- **Fallback Mechanisms**: Multiple strategies for finding numeric data columns
+- **Flexible Data Processing**: Handles various data formats and structures automatically
 
 ## Logging Improvements
 
@@ -129,10 +137,11 @@ The enhanced logging will now show:
 
 ## Files Modified
 
-1. `chains/workflows.py` - Added MultiStepWebScrapingWorkflow
+1. `chains/workflows.py` - Added MultiStepWebScrapingWorkflow with dynamic column handling
 2. `main.py` - Enhanced logging and workflow detection
 3. `requirements.txt` - Added missing dependencies (beautifulsoup4, lxml, html5lib)
 4. `test_multi_step_workflow.py` - Basic test script (new)
 5. `test_improved_workflow.py` - Improved test with dependency checking (new)
-6. `install_dependencies.py` - Dependency installation script (new)
-7. `MULTI_STEP_FIXES.md` - This documentation (new) 
+6. `test_generic_scraping.py` - Generic web scraping test (new)
+7. `install_dependencies.py` - Dependency installation script (new)
+8. `MULTI_STEP_FIXES.md` - This documentation (new) 
