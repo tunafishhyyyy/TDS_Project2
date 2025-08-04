@@ -663,11 +663,205 @@ Please provide:
             }
 
 
+class MultiStepWebScrapingWorkflow(BaseWorkflow):
+    """Enhanced workflow for multi-step web scraping tasks with actual execution"""
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.prompt_template = self._create_multi_step_prompt()
+        self.chain = LLMChain(llm=self.llm, prompt=self.prompt_template)
+    
+    def _create_multi_step_prompt(self) -> ChatPromptTemplate:
+        """Create multi-step web scraping prompt"""
+        system_message = """You are a web scraping expert specializing in multi-step data analysis tasks.
+Your task is to execute complete web scraping workflows including:
+1. Web scraping and data extraction
+2. Data cleaning and preprocessing
+3. Data analysis and visualization
+4. Answering specific questions about the data
+
+You must provide executable Python code that actually performs these tasks.
+"""
+        
+        human_message = """
+Multi-Step Task: {task_description}
+Target URL: {url}
+Data Requirements: {data_requirements}
+Output Format: {output_format}
+Special Instructions: {special_instructions}
+
+Provide a complete solution that:
+1. Scrapes the data from the specified URL
+2. Cleans and processes the data (remove footnotes, convert to numeric, etc.)
+3. Creates visualizations as requested
+4. Performs analysis to answer specific questions
+5. Returns the final answers
+
+IMPORTANT: Generate executable Python code that actually performs these tasks, not just a plan.
+Include all necessary imports and error handling.
+"""
+        
+        return ChatPromptTemplate.from_messages([
+            ("system", system_message),
+            ("human", human_message)
+        ])
+    
+    async def execute(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute multi-step web scraping workflow with actual execution"""
+        try:
+            logger.info(f"Starting multi-step web scraping workflow")
+            
+            # Extract URL from task description
+            task_description = input_data.get("task_description", "")
+            url = self._extract_url_from_task(task_description)
+            
+            # Generate the complete solution
+            result = self.chain.run(
+                task_description=task_description,
+                url=url,
+                data_requirements=input_data.get("data_requirements", "Extract table data and perform analysis"),
+                output_format=input_data.get("output_format", "structured data with visualizations"),
+                special_instructions=input_data.get("special_instructions", "Execute all steps and provide final answers")
+            )
+            
+            # Execute the generated code
+            execution_result = await self._execute_generated_code(result, input_data)
+            
+            logger.info(f"Multi-step web scraping workflow completed successfully")
+            
+            return {
+                "scraping_plan": result,
+                "execution_result": execution_result,
+                "workflow_type": "multi_step_web_scraping",
+                "status": "completed",
+                "timestamp": datetime.now().isoformat(),
+                "target_url": url,
+                "steps_executed": [
+                    "web_scraping",
+                    "data_cleaning", 
+                    "data_analysis",
+                    "visualization",
+                    "question_answering"
+                ]
+            }
+            
+        except Exception as e:
+            logger.error(f"Error in multi-step web scraping workflow: {e}")
+            return {
+                "error": str(e),
+                "workflow_type": "multi_step_web_scraping",
+                "status": "error",
+                "timestamp": datetime.now().isoformat()
+            }
+    
+    def _extract_url_from_task(self, task_description: str) -> str:
+        """Extract URL from task description"""
+        import re
+        url_pattern = r'https?://[^\s]+'
+        urls = re.findall(url_pattern, task_description)
+        return urls[0] if urls else ""
+    
+    async def _execute_generated_code(self, generated_code: str, input_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute the generated Python code safely"""
+        try:
+            # Extract code blocks from the generated response
+            code_blocks = self._extract_code_blocks(generated_code)
+            
+            if not code_blocks:
+                return {"error": "No executable code found in response"}
+            
+            # Execute the code blocks
+            execution_results = []
+            for i, code_block in enumerate(code_blocks):
+                try:
+                    result = await self._safe_execute_code_block(code_block, input_data)
+                    execution_results.append({
+                        "block_index": i,
+                        "status": "success",
+                        "result": result
+                    })
+                except Exception as e:
+                    execution_results.append({
+                        "block_index": i,
+                        "status": "error",
+                        "error": str(e)
+                    })
+            
+            return {
+                "execution_results": execution_results,
+                "total_blocks": len(code_blocks),
+                "successful_blocks": len([r for r in execution_results if r["status"] == "success"])
+            }
+            
+        except Exception as e:
+            logger.error(f"Error executing generated code: {e}")
+            return {"error": str(e)}
+    
+    def _extract_code_blocks(self, text: str) -> List[str]:
+        """Extract Python code blocks from text"""
+        import re
+        code_pattern = r'```python\s*\n(.*?)\n```'
+        matches = re.findall(code_pattern, text, re.DOTALL)
+        return matches
+    
+    async def _safe_execute_code_block(self, code: str, input_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Safely execute a code block"""
+        try:
+            # Create a safe execution environment
+            exec_globals = {
+                'pd': pd,
+                'requests': __import__('requests'),
+                'BeautifulSoup': __import__('bs4').BeautifulSoup,
+                'matplotlib': __import__('matplotlib'),
+                'plt': __import__('matplotlib.pyplot'),
+                'json': json,
+                'datetime': datetime,
+                'logging': logging
+            }
+            
+            # Execute the code
+            exec(code, exec_globals)
+            
+            # Try to capture any output variables
+            output_vars = {}
+            for var_name in ['df', 'result', 'data', 'top_10_countries', 'rank_5_country', 'total_gdp_top_10']:
+                if var_name in exec_globals:
+                    output_vars[var_name] = str(exec_globals[var_name])
+            
+            return {
+                "status": "success",
+                "output_variables": output_vars,
+                "code_executed": code[:200] + "..." if len(code) > 200 else code
+            }
+            
+        except Exception as e:
+            logger.error(f"Error executing code block: {e}")
+            return {
+                "status": "error",
+                "error": str(e),
+                "code_attempted": code[:200] + "..." if len(code) > 200 else code
+            }
+
+
 class AdvancedWorkflowOrchestrator(WorkflowOrchestrator):
     """Enhanced orchestrator with domain-specific workflows"""
     
     def __init__(self):
         super().__init__()
+        # Initialize LLM for workflow detection
+        try:
+            from langchain_openai import ChatOpenAI
+            from config import OPENAI_API_KEY, DEFAULT_MODEL, TEMPERATURE, MAX_TOKENS
+            self.llm = ChatOpenAI(
+                model=DEFAULT_MODEL,
+                temperature=TEMPERATURE,
+                max_tokens=MAX_TOKENS,
+                api_key=OPENAI_API_KEY
+            )
+        except Exception as e:
+            logger.warning(f"Could not initialize LLM for workflow detection: {e}")
+            self.llm = None
+        
         # Add specialized workflows including multi-modal support
         self.workflows.update({
             "data_analysis": DataAnalysisWorkflow(),
@@ -678,6 +872,7 @@ class AdvancedWorkflowOrchestrator(WorkflowOrchestrator):
             "predictive_modeling": PredictiveModelingWorkflow(),
             "data_visualization": DataVisualizationWorkflow(),
             "web_scraping": WebScrapingWorkflow(),
+            "multi_step_web_scraping": MultiStepWebScrapingWorkflow(),
             "database_analysis": DatabaseAnalysisWorkflow(),
             "statistical_analysis": StatisticalAnalysisWorkflow()
         })

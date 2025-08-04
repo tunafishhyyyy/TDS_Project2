@@ -1,11 +1,10 @@
-What are the key insights from the provided data?
-
-Please analyze the data and provide:
-1. A summary of the main patterns and trends
-2. Any statistical correlations you can identify
-3. Recommendations based on the analysis
-4. Potential areas for further investigation
-
-If code generation is needed, please provide executable Python code that demonstrates the analysis.
-
-Additional context: This is a test analysis to demonstrate the multi-modal capabilities of the data analysis API.
+Instruction to Agent:
+Scrape the table from this Wikipedia page:
+https://en.wikipedia.org/wiki/List_of_countries_by_GDP_(nominal)
+Then:
+Clean the data — remove footnote references and extra symbols.
+Convert GDP numbers to numeric format.
+Plot top 10 countries by GDP.
+Answer:
+Which country ranks 5th by GDP?
+What is the total GDP of the top 10 countries?

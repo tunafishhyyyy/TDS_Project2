@@ -19,7 +19,11 @@ from config import API_VERSION, TIMEOUT
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler('app.log')
+    ]
 )
 logger = logging.getLogger(__name__)
 
@@ -238,9 +242,13 @@ async def detect_workflow_type_llm(task_description: str, default_workflow: str 
                 - predictive_modeling: Machine learning model development
                 - data_visualization: Creating charts, graphs, and visualizations
                 - web_scraping: Extract data from websites or web pages (including Wikipedia)
+                - multi_step_web_scraping: Multi-step web scraping with data cleaning, analysis, and visualization
                 - database_analysis: SQL analysis using databases like DuckDB
                 - statistical_analysis: Statistical analysis including correlation and regression
                 - text_analysis: Natural language processing and text analytics
+                
+                IMPORTANT: If the task involves web scraping AND multiple steps (scraping, cleaning, analysis, visualization, answering questions), use 'multi_step_web_scraping'.
+                If it's just basic web scraping without complex analysis, use 'web_scraping'.
                 
                 Return ONLY the workflow type name, nothing else."""),
                 ("human", "Task: {task_description}")
@@ -256,8 +264,8 @@ async def detect_workflow_type_llm(task_description: str, default_workflow: str 
             valid_workflows = [
                 "data_analysis", "image_analysis", "code_generation", 
                 "exploratory_data_analysis", "predictive_modeling", 
-                "data_visualization", "web_scraping", "database_analysis", 
-                "statistical_analysis", "text_analysis"
+                "data_visualization", "web_scraping", "multi_step_web_scraping", 
+                "database_analysis", "statistical_analysis", "text_analysis"
             ]
             
             if detected_workflow in valid_workflows:
@@ -296,9 +304,13 @@ def detect_workflow_type_fallback(task_description: str, default_workflow: str =
     if any(keyword in task_lower for keyword in ['court', 'judgment', 'legal', 'case', 'disposal', 'judge', 'cnr', 'ecourts']):
         return "data_analysis"
     
-    # Wikipedia patterns - map to web scraping  
+    # Wikipedia patterns with multi-step analysis - map to multi-step web scraping
     if any(keyword in task_lower for keyword in ['wikipedia', 'wiki', 'scrape', 'list of', 'table from']):
-        return "web_scraping"
+        # Check if it involves multiple steps (cleaning, analysis, visualization, questions)
+        if any(keyword in task_lower for keyword in ['clean', 'plot', 'top 10', 'rank', 'total', 'answer', 'question']):
+            return "multi_step_web_scraping"
+        else:
+            return "web_scraping"
     
     # Statistical analysis patterns
     if any(keyword in task_lower for keyword in ['correlation', 'regression', 'statistical', 'trend', 'slope']):
@@ -475,6 +487,7 @@ async def analyze_data(
         # Intelligent workflow type detection using LLM
         detected_workflow = await detect_workflow_type_llm(task_description, "data_analysis")
         logger.info(f"Detected workflow: {detected_workflow}")
+        logger.info(f"Task description: {task_description[:200]}...")
         
         # Prepare enhanced workflow input
         workflow_input = {
@@ -487,16 +500,21 @@ async def analyze_data(
             "output_requirements": extract_output_requirements(task_description)
         }
         
+        logger.info(f"Workflow input prepared with {len(workflow_input)} keys")
+        logger.info(f"Additional files: {list(file_contents.keys())}")
+        
         # Execute workflow synchronously (always within 3 minutes)
-        logger.info(f"Processing task {task_id} synchronously")
+        logger.info(f"Processing task {task_id} synchronously with workflow: {detected_workflow}")
         
         try:
+            logger.info(f"Starting workflow execution for {detected_workflow}")
             result = await asyncio.wait_for(
                 execute_workflow_sync(detected_workflow, workflow_input, task_id),
                 timeout=180  # 3 minutes
             )
             
             logger.info(f"Task {task_id} completed successfully")
+            logger.info(f"Result keys: {list(result.keys()) if isinstance(result, dict) else 'Not a dict'}")
             
             return {
                 "task_id": task_id,
@@ -546,11 +564,29 @@ async def execute_workflow_sync(workflow_type: str, workflow_input: Dict[str, An
                 "files_processed": list(workflow_input.get("additional_files", {}).keys())
             }
         else:
+            logger.info(f"Executing workflow {workflow_type} with orchestrator")
+            logger.info(f"Available workflows: {list(orchestrator.workflows.keys())}")
+            
+            if workflow_type not in orchestrator.workflows:
+                logger.warning(f"Workflow {workflow_type} not found, available: {list(orchestrator.workflows.keys())}")
+                return {
+                    "workflow_type": workflow_type,
+                    "status": "error",
+                    "message": f"Workflow {workflow_type} not found",
+                    "available_workflows": list(orchestrator.workflows.keys())
+                }
+            
             result = await orchestrator.execute_workflow(workflow_type, workflow_input)
             logger.info(f"Workflow {workflow_type} executed successfully for task {task_id}")
+            logger.info(f"Result type: {type(result)}")
+            if isinstance(result, dict):
+                logger.info(f"Result keys: {list(result.keys())}")
             return result
     except Exception as e:
         logger.error(f"Error executing workflow {workflow_type}: {e}")
+        logger.error(f"Exception type: {type(e)}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         raise e
 
 
