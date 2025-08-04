@@ -720,8 +720,9 @@ IMPORTANT:
 - CRITICAL: After cleaning data, use data.select_dtypes(include=[np.number]).columns.tolist() to find numeric columns
 - CRITICAL: Never assume data.columns[1] is a column name - it might be a value
 - CRITICAL: Always verify column types before using them for analysis
-- CRITICAL: For Wikipedia GDP data, the main table is usually the one with the most rows (200+ rows)
+- CRITICAL: For Wikipedia data, the main table is usually the one with the most rows
 - CRITICAL: Always print table information to verify you're selecting the right table
+- CRITICAL: Store final answers in variables so they can be captured in the response
 
 Example approach:
 ```python
@@ -859,9 +860,14 @@ if len(numeric_cols) > 0:
     # Step 5: Answer specific questions
     if len(top_10) >= 5:
         # Use dynamic column names - don't assume specific names
-        first_col = data.columns[0]  # First column (usually country/territory name)
+        first_col = data.columns[0]  # First column (usually name/identifier)
         fifth_item = top_10.iloc[4][first_col]
         total_top_10 = top_10[analysis_col].sum()
+        
+        # Store answers in variables for capture
+        answer_1 = fifth_item
+        answer_2 = total_top_10
+        analysis_results = top_10[[first_col, analysis_col]].to_dict('records')
         
         print(f"\\nANSWERS:")
         print(f"Item ranking 5th by {{analysis_col}}: {{fifth_item}}")
@@ -873,8 +879,14 @@ if len(numeric_cols) > 0:
             print(f"{{i+1}}. {{row[first_col]}}: {{row[analysis_col]}}")
     else:
         print(f"\\nNot enough data for ranking analysis")
+        answer_1 = "Not enough data"
+        answer_2 = 0
+        analysis_results = []
 else:
     print("\\nNo numeric columns found for analysis")
+    answer_1 = "No numeric data found"
+    answer_2 = 0
+    analysis_results = []
 """
         
         return ChatPromptTemplate.from_messages([
@@ -1024,7 +1036,10 @@ else:
             
             # Try to capture any output variables
             output_vars = {}
-            for var_name in ['df', 'result', 'data', 'top_10_countries', 'rank_5_country', 'total_gdp_top_10', 'fifth_country', 'gdp_data', 'tables', 'gdp_column']:
+            
+            # Capture common data variables
+            common_vars = ['df', 'result', 'data', 'tables', 'gdp_data', 'gdp_column', 'analysis_data', 'cleaned_data', 'processed_data']
+            for var_name in common_vars:
                 if var_name in exec_globals:
                     var_value = exec_globals[var_name]
                     if hasattr(var_value, 'to_string'):
@@ -1035,6 +1050,24 @@ else:
                         output_vars[var_name] = f"List/Array with {len(var_value)} items: {str(var_value)[:200]}..."
                     else:
                         output_vars[var_name] = str(var_value)
+            
+            # Capture ALL variables that might contain answers (generic approach)
+            for var_name, var_value in exec_globals.items():
+                if not var_name.startswith('_') and var_name not in ['pd', 'np', 'plt', 'requests', 'json', 'datetime', 'logging', 'BeautifulSoup']:
+                    # Skip already captured variables
+                    if var_name not in output_vars:
+                        try:
+                            # Capture any variable that might be an answer
+                            if isinstance(var_value, (str, int, float, list, dict)):
+                                output_vars[var_name] = str(var_value)
+                            elif hasattr(var_value, 'to_string'):
+                                output_vars[var_name] = var_value.to_string()
+                            elif hasattr(var_value, 'shape'):
+                                output_vars[var_name] = f"DataFrame shape: {var_value.shape}, columns: {list(var_value.columns)}"
+                            else:
+                                output_vars[var_name] = str(var_value)
+                        except:
+                            pass
             
             return {
                 "status": "success",
