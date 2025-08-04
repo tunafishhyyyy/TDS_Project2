@@ -742,8 +742,30 @@ try:
         print(table.head(3))
     
     # Select the most relevant table based on content
-    # You can modify this logic based on what you're looking for
-    data = tables[0]  # Start with first table, adjust as needed
+    # Look for the table with the most rows and GDP-related content
+    best_table_idx = 0
+    best_table_score = 0
+    
+    for i, table in enumerate(tables):
+        score = 0
+        # Prefer tables with more rows (more data)
+        if table.shape[0] > 10:
+            score += 10
+        # Prefer tables with more columns (more information)
+        if table.shape[1] > 2:
+            score += 5
+        # Check for GDP-related keywords in column names
+        for col in table.columns:
+            col_str = str(col).lower()
+            if 'gdp' in col_str or 'economy' in col_str or 'country' in col_str:
+                score += 3
+        
+        if score > best_table_score:
+            best_table_score = score
+            best_table_idx = i
+    
+    data = tables[best_table_idx]
+    print(f"Selected table {best_table_idx} with score {best_table_score}")
     
 except Exception as e:
     print(f"pandas read_html failed: {{e}}")
@@ -773,6 +795,13 @@ print("\\nFirst few rows:")
 print(data.head())
 
 # Clean the data structure
+# Handle complex column structures (like MultiIndex columns)
+if isinstance(data.columns, pd.MultiIndex):
+    # Flatten MultiIndex columns
+    data.columns = [col[1] if isinstance(col, tuple) and col[1] else str(col) for col in data.columns]
+    print("\\nFlattened MultiIndex columns:")
+    print(f"Columns: {{data.columns.tolist()}}")
+
 # Check if first row contains headers
 if data.iloc[0].dtype == 'object':
     # Use first row as headers
@@ -784,8 +813,12 @@ if data.iloc[0].dtype == 'object':
 # Clean numeric columns (remove symbols, convert to numeric)
 for col in data.columns:
     if data[col].dtype == 'object':
-        # Try to convert to numeric, removing common symbols
+        # Try to convert to numeric, removing common symbols and footnotes
         cleaned = data[col].astype(str).str.replace('$', '').str.replace(',', '').str.replace('€', '').str.replace('£', '')
+        # Remove footnote references like [1], [2], etc.
+        cleaned = cleaned.str.replace(r'\\[\\d+\\]', '', regex=True)
+        # Remove any remaining non-numeric characters except decimal points
+        cleaned = cleaned.str.replace(r'[^\\d.]', '', regex=True)
         data[col] = pd.to_numeric(cleaned, errors='coerce')
 
 print("\\nAfter cleaning:")
@@ -797,12 +830,16 @@ numeric_cols = data.select_dtypes(include=[np.number]).columns.tolist()
 print(f"\\nNumeric columns available: {{numeric_cols}}")
 
 if len(numeric_cols) > 0:
-    # Use the first numeric column for analysis
+    # Use the first numeric column for analysis (usually the GDP column)
     analysis_col = numeric_cols[0]
     print(f"Using column '{{analysis_col}}' for analysis")
     
+    # Remove rows with NaN values in the analysis column
+    data_clean = data.dropna(subset=[analysis_col])
+    print(f"After removing NaN values: {{data_clean.shape[0]}} rows")
+    
     # Sort by the analysis column
-    data_sorted = data.sort_values(analysis_col, ascending=False)
+    data_sorted = data_clean.sort_values(analysis_col, ascending=False)
     
     # Get top 10 items
     top_10 = data_sorted.head(10)
