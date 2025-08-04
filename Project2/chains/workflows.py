@@ -5,6 +5,7 @@ Specific workflow implementations for data analysis tasks
 from typing import Dict, Any, List, Optional
 import pandas as pd
 import json
+import re
 from datetime import datetime
 import logging
 from chains.base import BaseWorkflow, WorkflowOrchestrator
@@ -749,20 +750,20 @@ try:
         print(table.head(3))
     
             # Select the most relevant table based on content
-        # Look for the table with the most rows (usually the main data table)
-        data = tables[0]  # Start with first table
-        max_rows = 0
-        best_table_idx = 0
-        
-        for i, table in enumerate(tables):
-            print(f"Table {{i}}: {{table.shape[0]}} rows, {{table.shape[1]}} columns")
-            if table.shape[0] > max_rows:
-                max_rows = table.shape[0]
-                best_table_idx = i
-                data = table
-        
-        print(f"Selected table {{best_table_idx}} with {{data.shape[0]}} rows and {{data.shape[1]}} columns")
-        print(f"This should be the main data table with the most rows")
+    # Look for the table with the most rows (usually the main data table)
+    data = tables[0]  # Start with first table
+    max_rows = 0
+    best_table_idx = 0
+    
+    for i, table in enumerate(tables):
+        print(f"Table {{i}}: {{table.shape[0]}} rows, {{table.shape[1]}} columns")
+        if table.shape[0] > max_rows:
+            max_rows = table.shape[0]
+            best_table_idx = i
+            data = table
+    
+    print(f"Selected table {{best_table_idx}} with {{data.shape[0]}} rows and {{data.shape[1]}} columns")
+    print(f"This should be the main data table with the most rows")
     
 except Exception as e:
     print(f"pandas read_html failed: {{e}}")
@@ -1084,6 +1085,132 @@ else:
             }
 
 
+class ModularWebScrapingWorkflow(BaseWorkflow):
+    """Fallback workflow using modular step-based approach when LLM is not available"""
+    
+    def __init__(self, **kwargs):
+        # Don't call super().__init__ since we don't need LLM for this approach
+        pass
+    
+    async def execute(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute modular web scraping workflow using step classes"""
+        try:
+            logger.info("Executing ModularWebScrapingWorkflow (fallback mode)")
+            
+            # Import the step classes from web_scraping_steps
+            try:
+                from .web_scraping_steps import (
+                    ScrapeTableStep,
+                    InspectTableStep,
+                    CleanDataStep,
+                    AnalyzeDataStep,
+                    VisualizeStep,
+                    AnswerQuestionsStep
+                )
+            except ImportError:
+                logger.error("Could not import web_scraping_steps module")
+                return {
+                    "error": "Web scraping steps module not found",
+                    "workflow_type": "multi_step_web_scraping",
+                    "status": "error",
+                    "timestamp": datetime.now().isoformat()
+                }
+            
+            # Extract URL from task description
+            task_description = input_data.get("task_description", "")
+            url = self._extract_url_from_task(task_description)
+            
+            if not url:
+                return {
+                    "error": "No URL found in task description",
+                    "workflow_type": "multi_step_web_scraping",
+                    "status": "error",
+                    "timestamp": datetime.now().isoformat()
+                }
+            
+            # Execute the step-based workflow
+            execution_log = []
+            data = {}
+            
+            try:
+                # Step 1: Scrape table
+                step1 = ScrapeTableStep()
+                step1_input = {'url': url}
+                step1_result = step1.run(step1_input)
+                data.update(step1_result)
+                execution_log.append("✓ Table scraping completed")
+                
+                # Step 2: Inspect table
+                step2 = InspectTableStep()
+                step2_result = step2.run(data)
+                data.update(step2_result)
+                execution_log.append("✓ Table inspection completed")
+                
+                # Step 3: Clean data
+                step3 = CleanDataStep()
+                step3_result = step3.run(data)
+                data.update(step3_result)
+                execution_log.append("✓ Data cleaning completed")
+                
+                # Step 4: Analyze data
+                step4 = AnalyzeDataStep()
+                step4_input = {**data, 'top_n': 10}
+                step4_result = step4.run(step4_input)
+                data.update(step4_result)
+                execution_log.append("✓ Data analysis completed")
+                
+                # Step 5: Visualize
+                step5 = VisualizeStep()
+                step5_result = step5.run(data)
+                data.update(step5_result)
+                execution_log.append("✓ Visualization completed")
+                
+                # Step 6: Answer questions
+                step6 = AnswerQuestionsStep()
+                step6_result = step6.run(data)
+                data.update(step6_result)
+                execution_log.append("✓ Question answering completed")
+                
+                return {
+                    "workflow_type": "multi_step_web_scraping",
+                    "status": "completed",
+                    "timestamp": datetime.now().isoformat(),
+                    "target_url": url,
+                    "execution_log": execution_log,
+                    "results": data.get('answers', {}),
+                    "plot_path": data.get('plot_path'),
+                    "message": "Workflow completed using step-based approach",
+                    "fallback_mode": True
+                }
+                
+            except Exception as e:
+                logger.error(f"Error in step execution: {e}")
+                return {
+                    "error": f"Step execution failed: {str(e)}",
+                    "workflow_type": "multi_step_web_scraping",
+                    "status": "error",
+                    "timestamp": datetime.now().isoformat(),
+                    "execution_log": execution_log,
+                    "target_url": url
+                }
+                
+        except Exception as e:
+            logger.error(f"Error in modular web scraping workflow: {e}")
+            return {
+                "error": str(e),
+                "workflow_type": "multi_step_web_scraping",
+                "status": "error",
+                "timestamp": datetime.now().isoformat()
+            }
+    
+    def _extract_url_from_task(self, task_description: str) -> str:
+        """Extract URL from task description"""
+        import re
+        url_pattern = r'https?://[^\s]+'
+        urls = re.findall(url_pattern, task_description)
+        return urls[0] if urls else ""
+
+
 class AdvancedWorkflowOrchestrator(WorkflowOrchestrator):
     """Enhanced orchestrator with domain-specific workflows"""
     
@@ -1093,30 +1220,39 @@ class AdvancedWorkflowOrchestrator(WorkflowOrchestrator):
         try:
             from langchain_openai import ChatOpenAI
             from config import OPENAI_API_KEY, DEFAULT_MODEL, TEMPERATURE, MAX_TOKENS
+            
+            if not OPENAI_API_KEY:
+                raise ValueError("OpenAI API key not found")
+                
             self.llm = ChatOpenAI(
                 model=DEFAULT_MODEL,
                 temperature=TEMPERATURE,
                 max_tokens=MAX_TOKENS,
                 api_key=OPENAI_API_KEY
             )
+            logger.info("LLM initialized successfully")
         except Exception as e:
             logger.warning(f"Could not initialize LLM for workflow detection: {e}")
             self.llm = None
         
         # Add specialized workflows including multi-modal support
+        # Only initialize workflows that require LLM if LLM is available
         self.workflows.update({
-            "data_analysis": DataAnalysisWorkflow(),
-            "image_analysis": ImageAnalysisWorkflow(),
-            "text_analysis": DataAnalysisWorkflow(),
-            "code_generation": CodeGenerationWorkflow(),
-            "exploratory_data_analysis": ExploratoryDataAnalysisWorkflow(),
-            "predictive_modeling": PredictiveModelingWorkflow(),
-            "data_visualization": DataVisualizationWorkflow(),
-            "web_scraping": WebScrapingWorkflow(),
-            "multi_step_web_scraping": MultiStepWebScrapingWorkflow(),
-            "database_analysis": DatabaseAnalysisWorkflow(),
-            "statistical_analysis": StatisticalAnalysisWorkflow()
+            "data_analysis": DataAnalysisWorkflow(llm=self.llm) if self.llm else None,
+            "image_analysis": ImageAnalysisWorkflow(llm=self.llm) if self.llm else None,
+            "text_analysis": DataAnalysisWorkflow(llm=self.llm) if self.llm else None,
+            "code_generation": CodeGenerationWorkflow(llm=self.llm) if self.llm else None,
+            "exploratory_data_analysis": ExploratoryDataAnalysisWorkflow(llm=self.llm) if self.llm else None,
+            "predictive_modeling": PredictiveModelingWorkflow(llm=self.llm) if self.llm else None,
+            "data_visualization": DataVisualizationWorkflow(llm=self.llm) if self.llm else None,
+            "web_scraping": WebScrapingWorkflow(llm=self.llm) if self.llm else None,
+            "multi_step_web_scraping": MultiStepWebScrapingWorkflow(llm=self.llm) if self.llm else ModularWebScrapingWorkflow(),
+            "database_analysis": DatabaseAnalysisWorkflow(llm=self.llm) if self.llm else None,
+            "statistical_analysis": StatisticalAnalysisWorkflow(llm=self.llm) if self.llm else None
         })
+        
+        # Remove None workflows
+        self.workflows = {k: v for k, v in self.workflows.items() if v is not None}
     
     async def execute_complete_analysis_pipeline(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """Execute a complete data analysis pipeline"""
