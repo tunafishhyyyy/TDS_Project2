@@ -88,8 +88,8 @@ class DataAnalysisChain(Chain, BaseWorkflow):
     input_keys: List[str] = ["task_description", "data_context", "parameters"]
     output_keys: List[str] = ["analysis_result", "recommendations", "metadata"]
     
-    def __init__(self, **kwargs):
-        BaseWorkflow.__init__(self, **kwargs)
+    def __init__(self, model_name: str = DEFAULT_MODEL, temperature: float = TEMPERATURE, **kwargs):
+        BaseWorkflow.__init__(self, model_name=model_name, temperature=temperature, **kwargs)
         Chain.__init__(self)
         self.prompt_template = self._create_analysis_prompt()
         self.chain = LLMChain(llm=self.llm, prompt=self.prompt_template)
@@ -318,7 +318,7 @@ class WorkflowOrchestrator:
     
     def __init__(self):
         self.workflows = {
-            "data_analysis": DataAnalysisChain(),
+            "data_analysis": DataAnalysisChain(model_name=DEFAULT_MODEL, temperature=TEMPERATURE),
             "code_generation": CodeGenerationChain(),
             "report_generation": ReportGenerationChain()
         }
