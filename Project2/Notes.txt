@@ -54,3 +54,34 @@ Action: Implement a validation step using a second LLM to check the correctness 
 10. Add an MIT LICENSE file to the project root.
 
 
+1. I think #6 is not handled correctly, the
+Workflows like WikipediaScrapingWorkflow, LegalDataAnalysisWorkflow are
+too specific and should be generalized to DataAnalysisWorkflow or similar. 
+Present: There are specific workflows (WikipediaScrapingWorkflow, LegalDataAnalysisWorkflow).
+Missing: Generalized workflows (e.g., DataAnalysisWorkflow) for broader use cases.
+Action: Refactor or add generalized workflows, and allow easy extension.
+
+2. No Backward compatibility endpoint Needed - not needed => single_file": "/api/single-file/ (POST - backward compatibility) 
+   also remove the related code if present in test_upload.html and other test scripts.
+
+3. similar "status": "/api/tasks/{task_id}/status (GET)" is also not needed, response should be synchronous.
+   Also remove the related code if present in test_upload.html and other test scripts.  
+
+4. following parameters will not be used in the API endpoint:
+    workflow_type: Optional[str] = Form("data_analysis"),
+    business_context: Optional[str] = Form(None),
+    sync_processing: Optional[bool] = Form(False, description="Process synchronously if True")
+
+   Instead, the endpoint will accept:
+   - "questions.txt" as a required file
+   - Optional additional files like "image.png", "data.csv"
+    task_description: this will be nothing but the content of questions.txt file.
+    the response always needs to be synchronous, so no need for sync_processing parameter.
+
+5. there wont be andy JSON based requests so /api/analyze this Legacy endpoint for JSON-based requests is not needed.
+   Also remove the related code if present in test_upload.html and other test scripts.
+
+   
+
+    
+

@@ -59,7 +59,7 @@ def check_dependencies():
     
     if missing_deps:
         print(f"\nMissing dependencies: {missing_deps}")
-        print("Run: python install_dependencies.py")
+        print("Run: python
         return False
     
     print("\n✓ All dependencies available!")

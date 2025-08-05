@@ -33,18 +33,45 @@ def mock_llm(prompt):
       ]}
     ]'''
 
+async def test_orchestrator():
+    """Test the orchestrator initialization and workflow execution"""
+    try:
+        # Test orchestrator creation
+        orchestrator = AdvancedWorkflowOrchestrator()
+        print('✓ Orchestrator created successfully')
+        print('Available workflows:', list(orchestrator.workflows.keys()))
+        print('LLM available:', orchestrator.llm is not None)
+        
+        # Read the user request from questions.txt
+        questions_path = os.path.join(os.path.dirname(__file__), 'questions.txt')
+        if os.path.exists(questions_path):
+            with open(questions_path, 'r') as f:
+                user_request = f.read()
+            
+            # Test workflow execution
+            workflow_input = {
+                "task_description": user_request,
+                "questions": user_request,
+                "additional_files": {},
+                "processed_files_info": {},
+                "workflow_type": "multi_step_web_scraping"
+            }
+            
+            result = await orchestrator.execute_workflow("multi_step_web_scraping", workflow_input)
+            print("\n--- Workflow Execution Result ---")
+            print(f"Status: {result.get('status', 'unknown')}")
+            print(f"Workflow Type: {result.get('workflow_type', 'unknown')}")
+            if 'error' in result:
+                print(f"Error: {result['error']}")
+            else:
+                print("✓ Workflow executed successfully")
+        else:
+            print("questions.txt not found, skipping workflow test")
+            
+    except Exception as e:
+        print(f'✗ Error: {e}')
+        import traceback
+        traceback.print_exc()
+
 if __name__ == '__main__':
-    # Read the user request from questions.txt
-    questions_path = os.path.join(os.path.dirname(__file__), 'questions.txt')
-    with open(questions_path, 'r') as f:
-        user_request = f.read()
-
-    # Use the mock LLM for demo/testing
-    result = run_llm_planned_workflow(user_request, llm=mock_llm)
-    print("\n--- LLM-driven Modular Workflow Result ---")
-    print(result)
-
-    # --- To use a real LLM, replace mock_llm with your LLM instance ---
-    # from your_llm_module import my_llm
-    # result = run_llm_planned_workflow(user_request, llm=my_llm)
-    # print(result) 
+    asyncio.run(test_orchestrator())

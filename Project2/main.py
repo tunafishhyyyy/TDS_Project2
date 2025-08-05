@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'chains'))
 try:
-    from workflows import AdvancedWorkflowOrchestrator
+    from chains.workflows import AdvancedWorkflowOrchestrator
     orchestrator = AdvancedWorkflowOrchestrator()
     logger.info("Successfully initialized AdvancedWorkflowOrchestrator")
     logger.info(f"Available workflows: {list(orchestrator.workflows.keys())}")
@@ -37,7 +37,7 @@ except Exception as e:
     logger.error(f"Could not import or initialize workflows: {e}")
     # Try to create a minimal orchestrator with just the fallback workflow
     try:
-        from workflows import ModularWebScrapingWorkflow
+        from chains.workflows import ModularWebScrapingWorkflow
         from chains.base import WorkflowOrchestrator
         
         class MinimalOrchestrator(WorkflowOrchestrator):

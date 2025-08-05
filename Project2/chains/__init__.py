@@ -29,7 +29,9 @@ from .workflows import (
     ExploratoryDataAnalysisWorkflow,
     PredictiveModelingWorkflow,
     DataVisualizationWorkflow,
-    AdvancedWorkflowOrchestrator
+    AdvancedWorkflowOrchestrator,
+    MultiStepWebScrapingWorkflow,
+    ModularWebScrapingWorkflow
 )
 
 __all__ = [
@@ -41,5 +43,7 @@ __all__ = [
     "ExploratoryDataAnalysisWorkflow",
     "PredictiveModelingWorkflow", 
     "DataVisualizationWorkflow",
-    "AdvancedWorkflowOrchestrator"
+    "AdvancedWorkflowOrchestrator",
+    "MultiStepWebScrapingWorkflow",
+    "ModularWebScrapingWorkflow"
 ]
