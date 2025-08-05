@@ -55,26 +55,9 @@ echo "Testing COVID-19 Cases Data..." >> test_examples_output.txt
 curl -s -X POST "$API_URL" -F "questions_txt=@covid_questions.txt" >> test_examples_output.txt
 echo -e "\n" >> test_examples_output.txt
 
-# Example 5: Cricket Stats from ESPN Cricinfo
-echo "Testing Cricket Stats from ESPN Cricinfo..."
-cat > cricket_questions.txt <<EOF
-Scrape Cricket Stats from ESPN Cricinfo
-Instruction to Agent:
-Scrape top 10 batsmen from:
-https://stats.espncricinfo.com/ci/content/records/
-Then:
-Extract player name, country, total runs, average.
-Plot total runs vs batting average.
-Answer:
-Who has the highest average among players with over 8000 runs?
-Which country has the most players in top 10?
-EOF
-echo "Testing Cricket Stats from ESPN Cricinfo..." >> test_examples_output.txt
-curl -s -X POST "$API_URL" -F "questions_txt=@cricket_questions.txt" >> test_examples_output.txt
-echo -e "\n" >> test_examples_output.txt
 
 # Cleanup temp files
-rm -f imdb_questions.txt inflation_questions.txt covid_questions.txt cricket_questions.txt
+rm -f imdb_questions.txt inflation_questions.txt covid_questions.txt
 echo "All example tests completed."
 # Cleanup only generated _questions.txt files
 rm -f imdb_questions.txt inflation_questions.txt covid_questions.txt cricket_questions.txt

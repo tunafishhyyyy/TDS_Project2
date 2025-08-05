@@ -1,0 +1,159 @@
+{
+    "task_id": "d749cb45-04f9-4521-b926-17525b5d4933",
+    "status": "completed",
+    "workflow_type": "multi_step_web_scraping",
+    "result": {
+        "workflow_type": "multi_step_web_scraping",
+        "status": "completed",
+        "timestamp": "2025-08-05T17:34:57.191323",
+        "target_url": "https://en.wikipedia.org/wiki/List_of_highest-grossing_films",
+        "execution_log": [
+            "\u2713 Data format detection completed",
+            "\u2713 Data extraction completed",
+            "\u2713 Table inspection completed",
+            "\u2713 Data cleaning completed",
+            "\u2713 Data analysis completed",
+            "\u2713 Visualization completed",
+            "\u2713 Question answering completed"
+        ],
+        "results": {
+            "llm_analysis_summary": "{\n    \"How many $2 bn movies were released before 2000?\": \"0\",\n    \"Which is the earliest film that grossed over $1.5 bn?\": \"Intolerance\",\n    \"What's the correlation between the Rank and Peak?\": \"0.9...",
+            "item_ranking_5th": "[# 230][# 231]",
+            "item_ranking_5th_value": 8.00000001e+16,
+            "total_top_n": 1.3567417045219958e+18,
+            "average_top_n": 6.783708522609979e+16,
+            "max_value": 4.74171806494e+17,
+            "min_value": 2500000.0,
+            "range": 4.741718064915e+17,
+            "correlations": {
+                "1916_vs_Intolerance": -0.7469358291488886,
+                "1916_vs_$1,750,000R IN": -0.03724670107645499,
+                "1916_vs_$385,907": 0.2946130986355512,
+                "Intolerance_vs_$1,750,000R IN": -0.02523640023820191,
+                "Intolerance_vs_$385,907": -0.13810509593038467,
+                "$1,750,000R IN_vs_$385,907": -0.026906043780289504
+            },
+            "top_n_list": [
+                {
+                    "rank": 1,
+                    "name": "[# 284][# 280][# 285]",
+                    "value": 4.74171806494e+17
+                },
+                {
+                    "rank": 2,
+                    "name": "[# 134][# 135][# 136][# 137][# 138]",
+                    "value": 3.9052519240238214e+17
+                },
+                {
+                    "rank": 3,
+                    "name": "[# 238][# 237][# 239][# 240]",
+                    "value": 2.46120974287e+17
+                },
+                {
+                    "rank": 4,
+                    "name": "[# 229][# 211]",
+                    "value": 1.4100000019e+17
+                },
+                {
+                    "rank": 5,
+                    "name": "[# 230][# 231]",
+                    "value": 8.00000001e+16
+                },
+                {
+                    "rank": 6,
+                    "name": "[# 158]",
+                    "value": 8000000022000000.0
+                },
+                {
+                    "rank": 7,
+                    "name": "[# 215][# 216][# 217]",
+                    "value": 7890000029400000.0
+                },
+                {
+                    "rank": 8,
+                    "name": "[# 219][# 218]",
+                    "value": 4400000050000000.0
+                },
+                {
+                    "rank": 9,
+                    "name": "[# 186][# 187][# 179]",
+                    "value": 2500000026100000.0
+                },
+                {
+                    "rank": 10,
+                    "name": "[# 173][# 178][# 179]",
+                    "value": 2103700026700000.0
+                },
+                {
+                    "rank": 11,
+                    "name": "[# 93][# 113]",
+                    "value": 30000004000000.0
+                },
+                {
+                    "rank": 12,
+                    "name": "[# 299]",
+                    "value": 10090468301.0
+                },
+                {
+                    "rank": 13,
+                    "name": "[# 130][# 131]",
+                    "value": 4180000007.0
+                },
+                {
+                    "rank": 14,
+                    "name": "[# 1]",
+                    "value": 2923706026.0
+                },
+                {
+                    "rank": 15,
+                    "name": "[# 3]",
+                    "value": 2797501328.0
+                },
+                {
+                    "rank": 16,
+                    "name": "[# 5][# 309][# 310]",
+                    "value": 2320250281.0
+                },
+                {
+                    "rank": 17,
+                    "name": "[# 7]",
+                    "value": 2257844554.0
+                },
+                {
+                    "rank": 18,
+                    "name": "[# 9][# 10]",
+                    "value": 2204060000.0
+                },
+                {
+                    "rank": 19,
+                    "name": "[# 11]",
+                    "value": 2068223624.0
+                },
+                {
+                    "rank": 20,
+                    "name": "[# 13][# 306]",
+                    "value": 2048359754.0
+                }
+            ],
+            "summary": {
+                "analysis_column": "$1,750,000R IN",
+                "name_column": "[52][53]",
+                "total_items_analyzed": 20,
+                "total_items_in_dataset": 130,
+                "data_type": "financial",
+                "domain": "movies"
+            },
+            "status": "success"
+        },
+        "plot_path": "generated",
+        "message": "Workflow completed using step-based approach",
+        "fallback_mode": true
+    },
+    "processing_info": {
+        "questions_file": "wikipedia_questions.txt",
+        "additional_files": [],
+        "workflow_auto_detected": true,
+        "processing_time": "synchronous"
+    },
+    "timestamp": "2025-08-05T17:34:57.213818"
+}

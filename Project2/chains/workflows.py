@@ -1189,6 +1189,9 @@ class ModularWebScrapingWorkflow(BaseWorkflow):
                     "execution_log": execution_log,
                     "results": data.get('answers', {}),
                     "plot_path": data.get('plot_path'),
+                    "plot_base64": data.get('plot_base64'),
+                    "chart_type": data.get('chart_type'),
+                    "image_size_bytes": data.get('image_size_bytes'),
                     "message": "Workflow completed using step-based approach",
                     "fallback_mode": True
                 }

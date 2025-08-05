@@ -310,6 +310,14 @@ def detect_workflow_type_fallback(task_description: str, default_workflow: str =
     
     task_lower = task_description.lower()
     
+    # Web scraping patterns (including specific domains) - PRIORITIZE BEFORE IMAGE ANALYSIS
+    if any(keyword in task_lower for keyword in ['wikipedia', 'wiki', 'scrape', 'list of', 'table from', 'coronavirus', 'worldometers', 'imdb', 'tradingeconomics', 'espn', 'cricinfo', 'website', 'url', 'html']):
+        # Check if it involves multiple steps (cleaning, analysis, visualization, questions)
+        if any(keyword in task_lower for keyword in ['clean', 'plot', 'top 10', 'rank', 'total', 'answer', 'question', 'extract', 'analyze', 'visualization']):
+            return "multi_step_web_scraping"
+        else:
+            return "multi_step_web_scraping"
+    
     # Image analysis patterns
     if any(keyword in task_lower for keyword in ['image', 'photo', 'picture', 'visual', 'png', 'jpg', 'jpeg']):
         return "image_analysis"
@@ -321,14 +329,6 @@ def detect_workflow_type_fallback(task_description: str, default_workflow: str =
     # Legal/Court data patterns - map to general data analysis
     if any(keyword in task_lower for keyword in ['court', 'judgment', 'legal', 'case', 'disposal', 'judge', 'cnr', 'ecourts']):
         return "data_analysis"
-    
-    # Web scraping patterns (including specific domains)
-    if any(keyword in task_lower for keyword in ['wikipedia', 'wiki', 'scrape', 'list of', 'table from', 'coronavirus', 'worldometers', 'imdb', 'tradingeconomics', 'espn', 'cricinfo', 'website', 'url', 'html']):
-        # Check if it involves multiple steps (cleaning, analysis, visualization, questions)
-        if any(keyword in task_lower for keyword in ['clean', 'plot', 'top 10', 'rank', 'total', 'answer', 'question', 'extract', 'analyze', 'visualization']):
-            return "multi_step_web_scraping"
-        else:
-            return "multi_step_web_scraping"
     
     # Statistical analysis patterns
     if any(keyword in task_lower for keyword in ['correlation', 'regression', 'statistical', 'trend', 'slope']):
