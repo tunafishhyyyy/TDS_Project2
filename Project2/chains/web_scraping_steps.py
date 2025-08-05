@@ -2,6 +2,9 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from typing import Any, Dict, List
+import logging
+
+logger = logging.getLogger(__name__)
 
 class ScrapeTableStep:
     """
@@ -25,18 +28,53 @@ class ScrapeTableStep:
                 print(f"  Sample data:")
                 print(table.head(3))
             
-            # Select the table with the most rows (and more than 50 rows to ensure it's data table)
-            max_rows = 0
+            # Select the best table for analysis
+            # Look for tables with substantial data and relevant content
             best_table_idx = 0
+            best_score = 0
             data = tables[0]
+            
             for i, table in enumerate(tables):
-                if table.shape[0] > max_rows and table.shape[0] > 50:  # Ensure substantial data
-                    max_rows = table.shape[0]
+                score = 0
+                
+                # Factor 1: Table size (more rows = better, but not too few)
+                if table.shape[0] > 50:  # Minimum threshold for substantial data
+                    score += table.shape[0] * 0.1
+                
+                # Factor 2: Number of columns (more columns often means more detailed data)
+                if table.shape[1] >= 3:  # At least 3 columns for meaningful data
+                    score += table.shape[1] * 5
+                
+                # Factor 3: Content analysis - look for data-like content
+                try:
+                    # Check if table contains country names or similar identifiers
+                    first_col_sample = table.iloc[:min(10, len(table)), 0].astype(str).str.lower()
+                    if any('united states' in str(val) or 'china' in str(val) or 'germany' in str(val) or 'india' in str(val) 
+                           for val in first_col_sample):
+                        score += 100  # Strong indicator of country data
+                    
+                    # Check for numeric data in other columns
+                    numeric_cols = table.select_dtypes(include=[np.number]).columns
+                    if len(numeric_cols) > 0:
+                        score += len(numeric_cols) * 10
+                    
+                    # Check for potential GDP/economic data indicators
+                    col_names = ' '.join([str(col) for col in table.columns]).lower()
+                    if any(indicator in col_names for indicator in ['imf', 'world bank', 'gdp', 'forecast', 'estimate']):
+                        score += 50
+                        
+                except Exception:
+                    pass  # Skip content analysis if it fails
+                
+                print(f"Table {i}: {table.shape[0]} rows, {table.shape[1]} cols, score: {score}")
+                
+                if score > best_score:
+                    best_score = score
                     best_table_idx = i
                     data = table
             
-            print(f"Selected table {best_table_idx} with {data.shape[0]} rows and {data.shape[1]} columns")
-            print(f"This should be the main GDP data table")
+            print(f"Selected table {best_table_idx} with {data.shape[0]} rows and {data.shape[1]} columns (score: {best_score})")
+            print(f"This should be the main data table")
             return {'data': data, 'tables': tables, 'selected_table_idx': best_table_idx}
         except Exception as e:
             print(f"Error scraping data: {e}")
@@ -78,10 +116,27 @@ class InspectTableStep:
         if len(data) > 1:
             # Check if first row looks like headers
             first_row_values = data.iloc[0].astype(str).tolist()
-            if any('Country' in str(val) or 'Territory' in str(val) for val in first_row_values):
+            # More robust header detection - look for text that suggests column headers
+            header_indicators = ['Country', 'Territory', 'Nation', 'State', 'IMF', 'World Bank', 'United Nations', 'Forecast', 'Estimate', 'Year']
+            if any(indicator in str(val) for val in first_row_values for indicator in header_indicators):
                 first_row_is_header = True
+                print(f"Header indicators found in first row: {first_row_values}")
         
-        if first_row_is_header:
+        # Additional check: if current column names are MultiIndex tuples or non-descriptive
+        if isinstance(data.columns, pd.MultiIndex) or any(str(col).startswith('Unnamed') or str(col).isdigit() for col in data.columns):
+            print("Column names appear to be non-descriptive, checking for headers in data...")
+            # Check first few rows for potential headers
+            for row_idx in range(min(3, len(data))):
+                row_values = data.iloc[row_idx].astype(str).tolist()
+                header_indicators = ['Country', 'Territory', 'Nation', 'IMF', 'World Bank', 'United Nations', 'Forecast', 'Estimate']
+                if any(indicator in str(val) for val in row_values for indicator in header_indicators):
+                    first_row_is_header = True
+                    print(f"Found headers in row {row_idx}: {row_values}")
+                    # Use this row as headers
+                    data.columns = [str(val) for val in data.iloc[row_idx]]
+                    data = data[row_idx+1:].reset_index(drop=True)
+                    break
+        elif first_row_is_header:
             print("\nFirst row appears to be headers, setting as column names...")
             data.columns = [str(val) for val in data.iloc[0]]
             data = data[1:].reset_index(drop=True)
@@ -120,26 +175,31 @@ class CleanDataStep:
                 cleaned = cleaned.str.replace('€', '', regex=False)
                 cleaned = cleaned.str.replace('£', '', regex=False)
                 cleaned = cleaned.str.replace('¥', '', regex=False)
+                cleaned = cleaned.str.replace('%', '', regex=False)
                 
                 # Remove footnote references like [1], [n 1], etc.
                 cleaned = cleaned.str.replace(r'\[.*?\]', '', regex=True)
+                cleaned = cleaned.str.replace(r'\([^)]*\)', '', regex=True)  # Remove parentheses content
                 
                 # Remove any other non-numeric characters except decimal points and minus signs
                 cleaned = cleaned.str.replace(r'[^\d.\-]', '', regex=True)
                 
-                # Handle empty strings
+                # Handle empty strings and special cases
                 cleaned = cleaned.replace('', np.nan)
+                cleaned = cleaned.replace('nan', np.nan)
+                cleaned = cleaned.replace('NaN', np.nan)
                 
                 # Convert to numeric
                 numeric_data = pd.to_numeric(cleaned, errors='coerce')
                 
-                # Only replace if we got some valid numbers
+                # Only replace if we got some valid numbers (at least 10% of data should be numeric)
                 valid_count = numeric_data.notna().sum()
-                if valid_count > 0:
-                    print(f"  Converted {valid_count} values to numeric")
+                total_count = len(data)
+                if valid_count > 0 and valid_count >= max(5, total_count * 0.1):
+                    print(f"  Converted {valid_count} values to numeric ({valid_count/total_count*100:.1f}%)")
                     data[col] = numeric_data
                 else:
-                    print(f"  No valid numeric data found, keeping as text")
+                    print(f"  No valid numeric data found ({valid_count} values), keeping as text")
         
         print("\nAfter cleaning:")
         print(f"Data types:\n{data.dtypes}")
@@ -179,28 +239,76 @@ class AnalyzeDataStep:
         best_col = None
         max_valid_values = 0
         
+        # First, exclude non-data columns that contain summary/total values
+        filtered_numeric_cols = []
         for col in numeric_cols:
-            valid_count = data[col].notna().sum()
-            max_value = data[col].max()
-            print(f"Column '{col}': {valid_count} valid values, max value: {max_value}")
-            
-            # Choose column with most valid values and reasonable max value (GDP should be large)
-            if valid_count > max_valid_values and max_value > 1000:  # GDP in billions
-                max_valid_values = valid_count
-                best_col = col
+            col_name = str(col).lower()
+            # Skip columns that are likely summary columns or year columns
+            if ('world' in col_name or 'total' in col_name or 'sum' in col_name or 
+                col_name.isdigit() or len(col_name) == 4 and col_name.startswith('2')):
+                print(f"Skipping summary/year column: {col}")
+                continue
+            filtered_numeric_cols.append(col)
         
-        if not best_col:
-            # Fallback to first numeric column
-            best_col = numeric_cols[0]
+        # If no filtered columns, use all numeric columns
+        if not filtered_numeric_cols:
+            filtered_numeric_cols = numeric_cols
+            print("No filtered columns found, using all numeric columns")
+        
+        print(f"Filtered numeric columns for analysis: {filtered_numeric_cols}")
+        
+        for col in filtered_numeric_cols:
+            valid_count = data[col].notna().sum()
+            if valid_count > 0:
+                max_value = data[col].max()
+                min_value = data[col].min()
+                print(f"Column '{col}': {valid_count} valid values, range: {min_value} to {max_value}")
+                
+                # Choose column with most valid values and reasonable range
+                # GDP values should be large numbers (millions/billions)
+                if valid_count > max_valid_values and max_value > 100:  # Minimum threshold for meaningful data
+                    max_valid_values = valid_count
+                    best_col = col
+        
+        if not best_col and numeric_cols:
+            # Fallback to first numeric column that's not a summary column
+            for col in numeric_cols:
+                col_name = str(col).lower()
+                if not ('world' in col_name or col_name.isdigit()):
+                    best_col = col
+                    break
+            
+            # If still no column found, use first numeric column
+            if not best_col:
+                best_col = numeric_cols[0]
         
         print(f"Selected column '{best_col}' for analysis")
         
-        # Clean and analyze
+        # Clean and analyze - first filter out summary/total rows
         data_clean = data.dropna(subset=[best_col])
-        print(f"After removing NaN values: {data_clean.shape[0]} rows")
+        
+        # Filter out summary rows like "World", "Total", etc.
+        if len(data_clean) > 0:
+            # Find the name/identifier column (usually first text column)
+            text_cols = data_clean.select_dtypes(include=['object']).columns.tolist()
+            if text_cols:
+                name_col = text_cols[0]
+                print(f"Using '{name_col}' as identifier column for filtering")
+                
+                # Remove summary rows
+                summary_keywords = ['world', 'total', 'sum', 'all', 'global', 'aggregate']
+                before_count = len(data_clean)
+                for keyword in summary_keywords:
+                    data_clean = data_clean[~data_clean[name_col].astype(str).str.lower().str.contains(keyword, na=False)]
+                
+                after_count = len(data_clean)
+                if before_count != after_count:
+                    print(f"Filtered out {before_count - after_count} summary rows")
+        
+        print(f"After removing NaN values and summary rows: {data_clean.shape[0]} rows")
         
         if len(data_clean) == 0:
-            print("ERROR: No valid data after cleaning")
+            print("ERROR: No valid data after cleaning and filtering")
             return {'top_n_df': pd.DataFrame(), 'analysis_col': best_col}
         
         # Sort by the analysis column

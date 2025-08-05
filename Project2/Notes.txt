@@ -24,7 +24,8 @@ Action: Add synchronous processing for small tasks (return result within 3 minut
 Missing: The code does not enforce or expect questions.txt as a required file.
 Action: Update file handling logic to always process questions.txt and treat other files as optional.
 
-6. *These are not the final questions you’ll be evaluated on. These examples are indicative. so workflows like WikipediaScrapingWorkflow, LegalDataAnalysisWorkflow are
+6. *These are not the final questions you’ll be evaluated on. These examples are indicative. 
+so workflows like WikipediaScrapingWorkflow, LegalDataAnalysisWorkflow are
 too specific and should be generalized to DataAnalysisWorkflow or similar. 
 Present: There are specific workflows (WikipediaScrapingWorkflow, LegalDataAnalysisWorkflow).
 Missing: Generalized workflows (e.g., DataAnalysisWorkflow) for broader use cases.
