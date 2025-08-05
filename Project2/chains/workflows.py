@@ -1130,12 +1130,12 @@ class ModularWebScrapingWorkflow(BaseWorkflow):
             
             # Execute the step-based workflow
             execution_log = []
-            data = {}
+            data = {'task_description': task_description}  # Pass task description to all steps
             
             try:
                 # Step 1: Scrape table
                 step1 = ScrapeTableStep()
-                step1_input = {'url': url}
+                step1_input = {'url': url, 'task_description': task_description}
                 step1_result = step1.run(step1_input)
                 data.update(step1_result)
                 execution_log.append("✓ Table scraping completed")
@@ -1154,14 +1154,15 @@ class ModularWebScrapingWorkflow(BaseWorkflow):
                 
                 # Step 4: Analyze data
                 step4 = AnalyzeDataStep()
-                step4_input = {**data, 'top_n': 10}
+                step4_input = {**data, 'top_n': 20}  # Increased to handle more data types
                 step4_result = step4.run(step4_input)
                 data.update(step4_result)
                 execution_log.append("✓ Data analysis completed")
                 
-                # Step 5: Visualize
+                # Step 5: Visualize (auto-detect chart type from task)
                 step5 = VisualizeStep()
-                step5_result = step5.run(data)
+                step5_input = {**data, 'return_base64': True}
+                step5_result = step5.run(step5_input)
                 data.update(step5_result)
                 execution_log.append("✓ Visualization completed")
                 

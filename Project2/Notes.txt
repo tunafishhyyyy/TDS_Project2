@@ -86,3 +86,70 @@ Action: Refactor or add generalized workflows, and allow easy extension.
 
     
 
+Now we need to review our code and see if webscrpping tasks are generic enough that these will work for the following examples as well :
+
+Example 1: Scrape the list of highest grossing films from Wikipedia. It is at the URL:
+===========
+https://en.wikipedia.org/wiki/List_of_highest-grossing_films
+
+Answer the following questions and respond with a JSON array of strings containing the answer.
+
+1. How many $2 bn movies were released before 2000?
+2. Which is the earliest film that grossed over $1.5 bn?
+3. What's the correlation between the Rank and Peak?
+4. Draw a scatterplot of Rank and Peak along with a dotted red regression line through it.
+   Return as a base-64 encoded data URI, `"data:image/png;base64,iVBORw0KG..."` under 100,000 bytes.
+
+Example 2:
+---------
+Scrape IMDb Ratings for Top Movies
+Scrape the top 50 movies from:
+https://www.imdb.com/chart/top
+Then:
+Extract movie name, year, rating.
+Create a histogram of IMDb ratings.
+Answer:
+What is the average rating?
+Which decade has the most top-rated movies?
+
+Example 3:
+=========
+Scrape Inflation Data from Trading Economics
+Instruction to Agent:
+Scrape inflation rate data for India from:
+👉 https://tradingeconomics.com/india/inflation-cpi
+Then:
+Plot a time series of inflation over the last 12 months.
+Answer:
+What is the current inflation rate?
+What was the highest rate in the last year?
+
+Example 4: Scrape COVID-19 Cases Data
+======
+Instruction to Agent:
+Scrape the table from:
+👉 https://www.worldometers.info/coronavirus/
+Then:
+Extract top 20 countries by total cases.
+Plot total cases vs. deaths (scatter plot).
+Answer:
+Which country has the highest death-to-case ratio?
+What's the global average recovery rate?
+
+Example 5: Scrape Cricket Stats from ESPN Cricinfo
+Instruction to Agent:
+Scrape top 10 batsmen from:
+👉 https://stats.espncricinfo.com/ci/content/records/
+Then:
+Extract player name, country, total runs, average.
+Plot total runs vs batting average.
+Answer:
+Who has the highest average among players with over 8000 runs?
+Which country has the most players in top 10?
+
+
+The system needs to use LLM prompting to make web scraping more generic. 
+Analyzes table structure - Examines table dimensions, column names, and sample data
+Understands context - Uses the task description to determine relevance
+Scores tables generically - Provides reasoning for table selection without hardcoded patterns
+Returns selection - Identifies the best table index with confidence score

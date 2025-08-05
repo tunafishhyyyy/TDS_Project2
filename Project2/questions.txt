@@ -1,10 +1,9 @@
-Instruction to Agent:
-Scrape the table from this Wikipedia page:
-https://en.wikipedia.org/wiki/List_of_countries_by_GDP_(nominal)
+Scrape IMDb Ratings for Top Movies
+Scrape the top 50 movies from:
+https://www.imdb.com/chart/top
 Then:
-Clean the data — remove footnote references and extra symbols.
-Convert GDP numbers to numeric format.
-Plot top 10 countries by GDP.
+Extract movie name, year, rating.
+Create a histogram of IMDb ratings.
 Answer:
-Which country ranks 5th by GDP?
-What is the total GDP of the top 10 countries?
+What is the average rating?
+Which decade has the most top-rated movies?
