@@ -153,3 +153,8 @@ Analyzes table structure - Examines table dimensions, column names, and sample d
 Understands context - Uses the task description to determine relevance
 Scores tables generically - Provides reasoning for table selection without hardcoded patterns
 Returns selection - Identifies the best table index with confidence score
+
+
+Add a utility function to extract keywords/entities from the task description.
+Inject these keywords into the LLM prompts for table selection, header detection, column selection, cleaning, and visualization.
+Ensure all prompts reference these dynamic keywords, making the logic and prompts generic for any use case.

@@ -25,3 +25,28 @@ EMBEDDING_MODEL = "text-embedding-ada-002"
 # Chain Configuration
 CHAIN_TIMEOUT = 120  # seconds
 MAX_RETRIES = 3
+
+def get_chat_model():
+    """
+    Get a ChatOpenAI model instance with configuration
+    """
+    try:
+        from langchain.chat_models import ChatOpenAI
+        return ChatOpenAI(
+            openai_api_key=OPENAI_API_KEY,
+            model_name=DEFAULT_MODEL,
+            temperature=TEMPERATURE,
+            max_tokens=MAX_TOKENS
+        )
+    except ImportError:
+        # Fallback for newer LangChain versions
+        try:
+            from langchain_openai import ChatOpenAI
+            return ChatOpenAI(
+                api_key=OPENAI_API_KEY,
+                model=DEFAULT_MODEL,
+                temperature=TEMPERATURE,
+                max_tokens=MAX_TOKENS
+            )
+        except ImportError:
+            raise ImportError("Could not import ChatOpenAI from langchain or langchain_openai")

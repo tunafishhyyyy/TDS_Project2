@@ -1,0 +1,9 @@
+Scrape IMDb Ratings for Top Movies
+Scrape the top 50 movies from:
+https://www.imdb.com/chart/top
+Then:
+Extract movie name, year, rating.
+Create a histogram of IMDb ratings.
+Answer:
+What is the average rating?
+Which decade has the most top-rated movies?

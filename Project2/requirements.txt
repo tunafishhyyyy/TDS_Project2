@@ -7,7 +7,9 @@ langchain-core
 langsmith
 uvicorn[standard]
 pandas
+numpy
 matplotlib
+scipy
 duckdb
 requests
 python-multipart

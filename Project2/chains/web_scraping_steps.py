@@ -3,6 +3,30 @@ import numpy as np
 import matplotlib.pyplot as plt
 from typing import Any, Dict, List
 import math
+import re
+import requests
+from bs4 import BeautifulSoup
+import json
+import logging
+
+def extract_keywords(task_description: str) -> List[str]:
+    """
+    Extracts keywords/entities from the task description using a simple regex and stopword filtering.
+    This can be replaced with a more advanced NLP/LLM-based extractor if needed.
+    """
+    stopwords = set([
+        'the', 'of', 'and', 'to', 'in', 'for', 'by', 'with', 'on', 'at', 'from', 'as', 'is', 'are', 'was', 'were', 'be', 'been', 'has', 'have', 'had', 'a', 'an', 'or', 'that', 'this', 'which', 'who', 'what', 'when', 'where', 'how', 'why', 'it', 'its', 'their', 'his', 'her', 'our', 'your', 'my', 'but', 'not', 'so', 'do', 'does', 'did', 'can', 'could', 'should', 'would', 'will', 'shall', 'may', 'might', 'must', 'also', 'such', 'than', 'then', 'there', 'here', 'these', 'those', 'all', 'any', 'each', 'other', 'some', 'many', 'most', 'more', 'less', 'few', 'lot', 'lots', 'just', 'even', 'still', 'yet', 'very', 'quite', 'rather', 'really', 'always', 'never', 'sometimes', 'often', 'usually', 'again', 'once', 'twice', 'first', 'second', 'third', 'next', 'last', 'new', 'old', 'good', 'bad', 'better', 'best', 'worst', 'same', 'different', 'another', 'own', 'much', 'such', 'big', 'small', 'large', 'great', 'high', 'low', 'long', 'short', 'early', 'late', 'young', 'old', 'important', 'main', 'major', 'minor', 'key', 'top', 'bottom', 'left', 'right', 'up', 'down', 'out', 'over', 'under', 'between', 'among', 'within', 'without', 'through', 'during', 'before', 'after', 'above', 'below', 'across', 'against', 'toward', 'upon', 'about', 'around', 'into', 'onto', 'off', 'near', 'far', 'away', 'back', 'forward', 'ahead', 'behind', 'beside', 'along', 'past', 'since', 'until', 'while', 'because', 'although', 'though', 'unless', 'except', 'despite', 'regardless', 'concerning', 'regarding', 'including', 'excluding', 'plus', 'minus', 'per', 'via', 'versus', 'vs', 'etc', 'i', 'you', 'he', 'she', 'we', 'they', 'me', 'him', 'her', 'us', 'them', 'myself', 'yourself', 'himself', 'herself', 'itself', 'ourselves', 'yourselves', 'themselves', 'whose', 'whom', 'which', 'what', 'where', 'when', 'why', 'how', 'if', 'then', 'else', 'because', 'since', 'until', 'while', 'although', 'though', 'unless', 'except', 'despite', 'regardless', 'concerning', 'regarding', 'including', 'excluding', 'plus', 'minus', 'per', 'via', 'versus', 'vs', 'etc'
+    ])
+    words = re.findall(r'\b\w+\b', task_description.lower())
+    keywords = [w for w in words if w not in stopwords and len(w) > 2]
+    # Remove duplicates, preserve order
+    seen = set()
+    result = []
+    for w in keywords:
+        if w not in seen:
+            seen.add(w)
+            result.append(w)
+    return result
 
 def sanitize_for_json(obj):
     """
@@ -20,44 +44,776 @@ def sanitize_for_json(obj):
     else:
         return obj
 import logging
+import json
+import re as regex
 
 logger = logging.getLogger(__name__)
 
-class ScrapeTableStep:
+class DetectDataFormatStep:
     """
-    Step 1: Generic web scraping and data extraction
-    - Use pandas.read_html (preferred) for scraping tables
-    - Print number of tables found
-    - Select the most relevant table based on size and content
-    - Print table info for verification
-    - Robust error handling for various website types
+    Step 0: LLM-powered data format detection
+    - Analyze webpage HTML structure to detect data availability and format
+    - Identify if data is in HTML tables, JSON, JavaScript variables, or other formats
+    - Provide extraction strategy recommendations
+    - Generic approach that works for any website (IMDb, Wikipedia, Trading Economics, etc.)
     """
     def run(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         url = input_data['url']
+        task_description = input_data.get('task_description', '')
+        
         try:
-            tables = pd.read_html(url)
-            print(f"Found {len(tables)} tables on the page")
-            # Inspect all tables
-            for i, table in enumerate(tables):
-                print(f"\nTable {i}:")
-                print(f"  Shape: {table.shape}")
-                print(f"  Columns: {table.columns.tolist()}")
-                print(f"  Sample data:")
-                print(table.head(3))
+            # Fetch webpage content
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
+                "Accept-Language": "en-US,en;q=0.9",
+                "Referer": "https://www.google.com/"
+            }
+            response = requests.get(url, headers=headers)
+            response.raise_for_status()
             
-            # LLM-powered table selection for generic web scraping
-            best_table_idx = self._select_best_table_with_llm(tables, input_data.get('task_description', ''))
-            data = tables[best_table_idx]
+            # Parse HTML content
+            soup = BeautifulSoup(response.text, "html.parser")
             
-            print(f"LLM selected table {best_table_idx} with {data.shape[0]} rows and {data.shape[1]} columns")
+            # Analyze page structure with LLM
+            format_analysis = self._analyze_data_format_with_llm(soup, task_description, url)
+            
+            print(f"Data format analysis for {url}:")
+            print(f"Format: {format_analysis['format']}")
+            print(f"Strategy: {format_analysis['strategy']}")
+            print(f"Confidence: {format_analysis['confidence']}")
+            if format_analysis.get('json_data'):
+                print(f"JSON data found: {len(format_analysis['json_data'])} characters")
+            
+            return sanitize_for_json({
+                'url': url,
+                'task_description': task_description,
+                'format_analysis': format_analysis,
+                'html_content': response.text,
+                'soup': soup  # Pass soup object for next steps
+            })
             
         except Exception as e:
-            print(f"Error scraping tables: {str(e)}")
-            raise
-        
-        return sanitize_for_json({'data': data, 'url': url})
+            print(f"Error in data format detection: {str(e)}")
+            # Fallback to traditional table scraping
+            return sanitize_for_json({
+                'url': url,
+                'task_description': task_description,
+                'format_analysis': {
+                    'format': 'html_tables',
+                    'strategy': 'pandas_read_html',
+                    'confidence': 'low',
+                    'fallback': True
+                }
+            })
     
-    def _select_best_table_with_llm(self, tables: List[pd.DataFrame], task_description: str = '') -> int:
+    def _analyze_data_format_with_llm(self, soup: BeautifulSoup, task_description: str, url: str) -> Dict[str, Any]:
+        """
+        Use LLM to analyze webpage structure and detect data format
+        """
+        try:
+            from langchain.prompts import ChatPromptTemplate
+            from langchain.schema import StrOutputParser
+            from config import get_chat_model
+            
+            # Extract key structural information
+            structure_info = self._extract_page_structure(soup)
+            
+            # Create LLM prompt for format detection
+            system_prompt = """You are an expert web scraping analyst. Analyze webpage structure to determine the best data extraction approach.
+
+Your task is to identify:
+1. Data format: html_tables, json_embedded, javascript_data, structured_divs, or mixed
+2. Extraction strategy: pandas_read_html, json_parsing, regex_extraction, custom_parsing
+3. Confidence level: high, medium, low
+
+Consider these indicators:
+- HTML <table> tags suggest html_tables format
+- <script> tags with JSON/data suggest javascript_data format  
+- Structured <div> patterns suggest structured_divs format
+- Multiple formats may coexist (mixed)
+
+Respond in this JSON format:
+{{
+  "format": "html_tables|json_embedded|javascript_data|structured_divs|mixed",
+  "strategy": "pandas_read_html|json_parsing|regex_extraction|custom_parsing",
+  "confidence": "high|medium|low",
+  "reasoning": "brief explanation",
+  "json_selectors": ["script[type='application/ld+json']", "script containing data"],
+  "table_selectors": ["table.chart", "table.data-table"],
+  "fallback_strategy": "alternative approach if primary fails"
+}}"""
+
+            human_prompt = """URL: {url}
+Task: {task_description}
+
+Page structure analysis:
+{structure_info}
+
+Determine the best data extraction approach for this webpage."""
+
+            prompt = ChatPromptTemplate.from_messages([
+                ("system", system_prompt),
+                ("human", human_prompt)
+            ])
+            
+            # Get LLM model and create chain
+            llm = get_chat_model()
+            chain = prompt | llm | StrOutputParser()
+            
+            # Invoke LLM with structure data
+            result = chain.invoke({
+                "url": url,
+                "task_description": task_description or "general data extraction",
+                "structure_info": structure_info
+            })
+            
+            # Parse LLM response
+            try:
+                # Clean up response and parse JSON
+                cleaned_result = result.strip()
+                if cleaned_result.startswith('```json'):
+                    cleaned_result = cleaned_result[7:]
+                if cleaned_result.endswith('```'):
+                    cleaned_result = cleaned_result[:-3]
+                
+                format_analysis = json.loads(cleaned_result)
+                
+                # Validate required fields
+                required_fields = ['format', 'strategy', 'confidence']
+                for field in required_fields:
+                    if field not in format_analysis:
+                        raise ValueError(f"Missing required field: {field}")
+                
+                # Extract JSON data if strategy suggests it
+                if format_analysis['strategy'] in ['json_parsing', 'regex_extraction']:
+                    json_data = self._extract_json_data(soup, format_analysis.get('json_selectors', []))
+                    if json_data:
+                        format_analysis['json_data'] = json_data
+                
+                return format_analysis
+                
+            except (json.JSONDecodeError, ValueError) as e:
+                print(f"Could not parse LLM response as JSON: {e}")
+                print(f"Raw response: {result}")
+                return self._fallback_format_analysis()
+                
+        except Exception as e:
+            print(f"Error in LLM format analysis: {str(e)}")
+            return self._fallback_format_analysis()
+    
+    def _extract_page_structure(self, soup: BeautifulSoup) -> str:
+        """
+        Extract key structural information from the webpage for LLM analysis
+        """
+        structure_info = []
+        
+        # Count HTML tables
+        tables = soup.find_all("table")
+        structure_info.append(f"HTML tables found: {len(tables)}")
+        if tables:
+            for i, table in enumerate(tables[:3]):  # Analyze first 3 tables
+                rows = len(table.find_all("tr"))
+                cols = len(table.find_all("td")) + len(table.find_all("th"))
+                classes = table.get("class", [])
+                structure_info.append(f"  Table {i}: {rows} rows, ~{cols} cells, classes: {classes}")
+        
+        # Check for JSON in script tags
+        scripts = soup.find_all("script")
+        json_scripts = 0
+        data_scripts = 0
+        for script in scripts:
+            if script.get("type") == "application/ld+json":
+                json_scripts += 1
+            elif script.string and ("data" in script.string.lower() or "{" in script.string):
+                data_scripts += 1
+        structure_info.append(f"Script tags: {len(scripts)} total, {json_scripts} JSON-LD, {data_scripts} with data")
+        
+        # Check for structured content divs
+        common_data_classes = ["chart", "data", "list", "table", "grid", "content", "results"]
+        structured_divs = 0
+        for class_name in common_data_classes:
+            divs = soup.find_all("div", class_=re.compile(class_name, re.IGNORECASE))
+            if divs:
+                structured_divs += len(divs)
+                structure_info.append(f"  Divs with '{class_name}' class: {len(divs)}")
+        
+        # Check for lists (ul, ol)
+        lists = soup.find_all(["ul", "ol"])
+        structure_info.append(f"Lists found: {len(lists)}")
+        
+        # Sample page content
+        text_content = soup.get_text()[:500] + "..." if len(soup.get_text()) > 500 else soup.get_text()
+        structure_info.append(f"Page content sample: {text_content}")
+        
+        return "\n".join(structure_info)
+    
+    def _extract_json_data(self, soup: BeautifulSoup, selectors: List[str]) -> str:
+        """
+        Extract JSON data from script tags based on provided selectors
+        """
+        json_data = ""
+        
+        # Try provided selectors first
+        for selector in selectors:
+            elements = soup.select(selector)
+            for element in elements:
+                if element.string:
+                    try:
+                        # Validate it's valid JSON
+                        json.loads(element.string)
+                        json_data += element.string + "\n"
+                    except json.JSONDecodeError:
+                        continue
+        
+        # Fallback: search all script tags for JSON-like content
+        if not json_data:
+            scripts = soup.find_all("script")
+            for script in scripts:
+                if script.string:
+                    text = script.string.strip()
+                    # Look for JSON objects or arrays
+                    if (text.startswith('{') and text.endswith('}')) or \
+                       (text.startswith('[') and text.endswith(']')):
+                        try:
+                            json.loads(text)
+                            json_data += text + "\n"
+                        except json.JSONDecodeError:
+                            continue
+                    # Look for variable assignments with JSON data
+                    json_pattern = r'(?:var|let|const)\s+\w+\s*=\s*(\{.*?\}|\[.*?\]);?'
+                    matches = re.findall(json_pattern, text, re.DOTALL)
+                    for match in matches:
+                        try:
+                            json.loads(match)
+                            json_data += match + "\n"
+                        except json.JSONDecodeError:
+                            continue
+        
+        return json_data.strip()
+    
+    def _fallback_format_analysis(self) -> Dict[str, Any]:
+        """
+        Fallback format analysis when LLM is unavailable
+        """
+        return {
+            'format': 'html_tables',
+            'strategy': 'pandas_read_html',
+            'confidence': 'low',
+            'reasoning': 'LLM analysis failed, using traditional table scraping',
+            'fallback': True
+        }
+
+class ScrapeTableStep:
+    """
+    Step 1: Enhanced data extraction based on format analysis
+    - Use format analysis from DetectDataFormatStep to choose extraction method
+    - Support multiple data formats: HTML tables, JSON, JavaScript data
+    - Intelligent fallback mechanisms
+    - Generic approach for any website structure
+    """
+    def run(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+        url = input_data['url']
+        format_analysis = input_data.get('format_analysis', {})
+        task_description = input_data.get('task_description', '')
+        
+        print(f"Extracting data using strategy: {format_analysis.get('strategy', 'pandas_read_html')}")
+        
+        try:
+            # Use existing soup if available, otherwise fetch fresh content
+            if 'soup' in input_data:
+                soup = input_data['soup']
+                html_content = input_data.get('html_content', '')
+            else:
+                headers = {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
+                    "Accept-Language": "en-US,en;q=0.9",
+                    "Referer": "https://www.google.com/"
+                }
+                response = requests.get(url, headers=headers)
+                response.raise_for_status()
+                soup = BeautifulSoup(response.text, "html.parser")
+                html_content = response.text
+            
+            # Extract data based on detected format
+            data = self._extract_data_by_strategy(soup, html_content, format_analysis, task_description)
+            
+            if data is None or (hasattr(data, 'empty') and data.empty):
+                raise ValueError("No data extracted from the webpage")
+            
+            print(f"Successfully extracted data with shape: {data.shape}")
+            print(f"Columns: {data.columns.tolist()}")
+            
+        except Exception as e:
+            print(f"Error in primary extraction strategy: {str(e)}")
+            print("Falling back to traditional table scraping...")
+            data = self._fallback_table_extraction(soup, task_description)
+            
+        return sanitize_for_json({'data': data, 'url': url, 'format_analysis': format_analysis})
+    
+    def _extract_data_by_strategy(self, soup, html_content: str, format_analysis: Dict, task_description: str) -> pd.DataFrame:
+        """
+        Extract data using the strategy recommended by format analysis
+        """
+        strategy = format_analysis.get('strategy', 'pandas_read_html')
+        
+        if strategy == 'json_parsing':
+            return self._extract_from_json(soup, format_analysis, task_description)
+        elif strategy == 'regex_extraction':
+            return self._extract_from_javascript(html_content, task_description)
+        elif strategy == 'custom_parsing':
+            return self._extract_from_structured_divs(soup, task_description)
+        else:  # Default to pandas_read_html
+            return self._extract_from_html_tables(soup, task_description)
+    
+    def _extract_from_json(self, soup, format_analysis: Dict, task_description: str) -> pd.DataFrame:
+        """
+        Extract data from JSON embedded in script tags
+        """
+        json_data = format_analysis.get('json_data', '')
+        if not json_data:
+            raise ValueError("No JSON data found")
+        
+        try:
+            # Parse JSON data
+            data_obj = json.loads(json_data)
+            
+            # Convert JSON to DataFrame using LLM guidance
+            df = self._json_to_dataframe_with_llm(data_obj, task_description)
+            return df
+            
+        except Exception as e:
+            raise ValueError(f"Failed to parse JSON data: {str(e)}")
+    
+    def _extract_from_javascript(self, html_content: str, task_description: str) -> pd.DataFrame:
+        """
+        Extract data from JavaScript variables using regex patterns
+        """
+        # Use LLM to identify relevant JavaScript patterns
+        js_data = self._extract_js_data_with_llm(html_content, task_description)
+        
+        if not js_data:
+            raise ValueError("No JavaScript data patterns found")
+        
+        # Convert extracted JS data to DataFrame
+        return self._parse_js_data_to_dataframe(js_data, task_description)
+    
+    def _extract_from_structured_divs(self, soup, task_description: str) -> pd.DataFrame:
+        """
+        Extract data from structured div elements (common in modern websites)
+        """
+        # Use LLM to identify relevant div patterns and extract data
+        return self._extract_div_data_with_llm(soup, task_description)
+    
+    def _extract_from_html_tables(self, soup, task_description: str) -> pd.DataFrame:
+        """
+        Traditional HTML table extraction with enhanced selection
+        """
+        tables_html = soup.find_all("table")
+        tables = []
+        
+        if tables_html:
+            for table_html in tables_html:
+                try:
+                    dfs = pd.read_html(str(table_html))
+                    tables.extend(dfs)
+                except Exception:
+                    continue
+        
+        if not tables:
+            # Enhanced fallback: try to extract from structured content
+            print("No <table> tags found, attempting structured content extraction...")
+            tables = self._extract_from_non_table_elements(soup)
+        
+        if not tables:
+            raise ValueError("No tables or structured data found")
+        
+        print(f"Found {len(tables)} tables on the page")
+        
+        # Inspect all tables
+        for i, table in enumerate(tables):
+            print(f"\nTable {i}:")
+            print(f"  Shape: {table.shape}")
+            print(f"  Columns: {table.columns.tolist()}")
+            print(f"  Sample data:")
+            print(table.head(3))
+        
+        # Use LLM-powered table selection
+        keywords = extract_keywords(task_description)
+        best_table_idx = self._select_best_table_with_llm(tables, task_description, keywords)
+        data = tables[best_table_idx]
+        print(f"Selected table {best_table_idx} with {data.shape[0]} rows and {data.shape[1]} columns")
+        
+        return data
+    
+    def _extract_from_non_table_elements(self, soup) -> List[pd.DataFrame]:
+        """
+        Extract tabular data from non-table HTML elements
+        Enhanced to handle various website structures
+        """
+        tables = []
+        
+        # Try to find structured content areas
+        content_selectors = [
+            ".chart", ".data-table", ".list", ".grid", ".content",
+            "[class*='chart']", "[class*='table']", "[class*='list']"
+        ]
+        
+        for selector in content_selectors:
+            elements = soup.select(selector)
+            for element in elements:
+                rows = element.find_all("tr")
+                if rows:
+                    extracted = []
+                    for row in rows:
+                        cells = row.find_all(["th", "td"])
+                        if cells:
+                            extracted.append([cell.get_text(strip=True) for cell in cells])
+                    
+                    if extracted and len(extracted) > 1:
+                        # Assume first row is header if it contains any <th>
+                        first_row_has_th = any(row.find_all("th") for row in [rows[0]] if rows)
+                        if first_row_has_th or len(extracted[0]) == len(extracted[1]):
+                            header = extracted[0]
+                            data_rows = extracted[1:]
+                        else:
+                            header = [f"Column_{i}" for i in range(len(extracted[0]))]
+                            data_rows = extracted
+                        
+                        if data_rows:
+                            df = pd.DataFrame(data_rows, columns=header)
+                            tables.append(df)
+                            print(f"Extracted {len(df)} rows from {selector} element.")
+        
+        return tables
+    
+    def _json_to_dataframe_with_llm(self, data_obj, task_description: str) -> pd.DataFrame:
+        """
+        Convert JSON object to DataFrame using LLM guidance
+        """
+        try:
+            from langchain.prompts import ChatPromptTemplate
+            from langchain.schema import StrOutputParser
+            from config import get_chat_model
+            
+            # Analyze JSON structure
+            json_sample = str(data_obj)[:1000] + "..." if len(str(data_obj)) > 1000 else str(data_obj)
+            
+            system_prompt = """You are a data extraction expert. Analyze the JSON structure and provide instructions for converting it to a tabular DataFrame.
+
+Identify:
+1. The path to the array/list containing the main data
+2. The key fields that should become DataFrame columns
+3. Any nested structures that need flattening
+
+Respond in this JSON format:
+{{
+  "data_path": "path.to.data.array (e.g., 'results', 'data.items', 'movies')",
+  "key_fields": ["field1", "field2", "field3"],
+  "nested_fields": {{"field_name": "path.to.nested.value"}},
+  "instructions": "brief explanation of the structure"
+}}"""
+
+            human_prompt = """Task: {task_description}
+
+JSON Structure Sample:
+{json_sample}
+
+Provide extraction instructions for converting this JSON to a DataFrame."""
+
+            prompt = ChatPromptTemplate.from_messages([
+                ("system", system_prompt),
+                ("human", human_prompt)
+            ])
+            
+            llm = get_chat_model()
+            chain = prompt | llm | StrOutputParser()
+            
+            result = chain.invoke({
+                "task_description": task_description,
+                "json_sample": json_sample
+            })
+            
+            # Parse LLM instructions and extract data
+            try:
+                instructions = json.loads(result.strip().replace('```json', '').replace('```', ''))
+                return self._extract_dataframe_from_json(data_obj, instructions)
+            except:
+                # Fallback: try to directly convert if it's a list of dicts
+                if isinstance(data_obj, list):
+                    return pd.DataFrame(data_obj)
+                elif isinstance(data_obj, dict):
+                    # Find the first list/array in the JSON
+                    for key, value in data_obj.items():
+                        if isinstance(value, list) and len(value) > 0:
+                            return pd.DataFrame(value)
+                raise ValueError("Could not determine JSON structure")
+                
+        except Exception as e:
+            raise ValueError(f"Failed to convert JSON to DataFrame: {str(e)}")
+    
+    def _extract_dataframe_from_json(self, data_obj, instructions: Dict) -> pd.DataFrame:
+        """
+        Extract DataFrame from JSON using LLM-provided instructions
+        """
+        # Navigate to data array using provided path
+        current_data = data_obj
+        data_path = instructions.get('data_path', '')
+        
+        if data_path:
+            for key in data_path.split('.'):
+                if key and key in current_data:
+                    current_data = current_data[key]
+        
+        if not isinstance(current_data, list):
+            raise ValueError("Data path does not lead to an array")
+        
+        # Extract specified fields
+        key_fields = instructions.get('key_fields', [])
+        nested_fields = instructions.get('nested_fields', {})
+        
+        rows = []
+        for item in current_data:
+            if isinstance(item, dict):
+                row = {}
+                # Extract key fields
+                for field in key_fields:
+                    row[field] = item.get(field, '')
+                # Extract nested fields
+                for field_name, nested_path in nested_fields.items():
+                    nested_value = item
+                    for key in nested_path.split('.'):
+                        if isinstance(nested_value, dict) and key in nested_value:
+                            nested_value = nested_value[key]
+                        else:
+                            nested_value = ''
+                            break
+                    row[field_name] = nested_value
+                rows.append(row)
+        
+        return pd.DataFrame(rows)
+    
+    def _extract_js_data_with_llm(self, html_content: str, task_description: str) -> str:
+        """
+        Use LLM to identify and extract relevant JavaScript data patterns
+        """
+        try:
+            from langchain.prompts import ChatPromptTemplate
+            from langchain.schema import StrOutputParser
+            from config import get_chat_model
+            
+            # Extract script content
+            import re
+            script_pattern = r'<script[^>]*>(.*?)</script>'
+            scripts = re.findall(script_pattern, html_content, re.DOTALL)
+            
+            # Sample scripts for LLM analysis
+            script_sample = ""
+            for script in scripts[:5]:  # Analyze first 5 scripts
+                if len(script) > 100:  # Only analyze substantial scripts
+                    script_sample += script[:500] + "\n---\n"
+            
+            system_prompt = """You are a JavaScript data extraction expert. Analyze script content to find data relevant to the task.
+
+Look for:
+1. Variable assignments with arrays/objects
+2. JSON data embedded in JavaScript
+3. API responses or data initialization
+4. Structured data patterns
+
+Extract the relevant JavaScript code that contains the data. Return only the data assignment or object definition."""
+
+            human_prompt = """Task: {task_description}
+
+JavaScript Content Sample:
+{script_sample}
+
+Extract the JavaScript code containing the relevant data for this task."""
+
+            prompt = ChatPromptTemplate.from_messages([
+                ("system", system_prompt),
+                ("human", human_prompt)
+            ])
+            
+            llm = get_chat_model()
+            chain = prompt | llm | StrOutputParser()
+            
+            result = chain.invoke({
+                "task_description": task_description,
+                "script_sample": script_sample
+            })
+            
+            return result.strip()
+            
+        except Exception as e:
+            print(f"Error in JavaScript extraction: {str(e)}")
+            return ""
+    
+    def _parse_js_data_to_dataframe(self, js_data: str, task_description: str) -> pd.DataFrame:
+        """
+        Parse extracted JavaScript data into DataFrame
+        """
+        # Try to extract JSON-like structures from JavaScript
+        json_pattern = r'(\{.*?\}|\[.*?\])'
+        matches = re.findall(json_pattern, js_data, re.DOTALL)
+        
+        for match in matches:
+            try:
+                # Clean up JavaScript to make it valid JSON
+                cleaned = match.replace("'", '"').replace('undefined', 'null')
+                data_obj = json.loads(cleaned)
+                return self._json_to_dataframe_with_llm(data_obj, task_description)
+            except:
+                continue
+        
+        raise ValueError("Could not parse JavaScript data to DataFrame")
+    
+    def _extract_div_data_with_llm(self, soup, task_description: str) -> pd.DataFrame:
+        """
+        Extract data from structured div elements using LLM guidance
+        """
+        try:
+            from langchain.prompts import ChatPromptTemplate
+            from langchain.schema import StrOutputParser
+            from config import get_chat_model
+            
+            # Find potential data containers
+            data_containers = soup.find_all(['div', 'section', 'article'], 
+                                          class_=re.compile(r'(chart|data|list|table|grid|content|results)', re.IGNORECASE))
+            
+            if not data_containers:
+                data_containers = soup.find_all(['div', 'section', 'article'])[:10]  # First 10 as fallback
+            
+            # Analyze container structure
+            container_info = []
+            for i, container in enumerate(data_containers[:5]):  # Analyze first 5
+                info = {
+                    'index': i,
+                    'tag': container.name,
+                    'classes': container.get('class', []),
+                    'content_preview': container.get_text()[:200],
+                    'child_count': len(container.find_all(True)),
+                    'structure': str(container)[:300]
+                }
+                container_info.append(info)
+            
+            system_prompt = """You are a web scraping expert specializing in extracting tabular data from div-based layouts.
+
+Analyze the HTML structure and identify which container holds the relevant data. Then provide extraction instructions.
+
+Respond in JSON format:
+{{
+  "container_index": 0,
+  "extraction_method": "text_rows|attribute_values|nested_elements",
+  "row_selector": "CSS selector for rows",
+  "cell_selector": "CSS selector for cells within rows",
+  "headers": ["column1", "column2", "column3"]
+}}"""
+
+            human_prompt = """Task: {task_description}
+
+Container Analysis:
+{container_info}
+
+Which container contains the data and how should it be extracted?"""
+
+            prompt = ChatPromptTemplate.from_messages([
+                ("system", system_prompt),
+                ("human", human_prompt)
+            ])
+            
+            llm = get_chat_model()
+            chain = prompt | llm | StrOutputParser()
+            
+            result = chain.invoke({
+                "task_description": task_description,
+                "container_info": json.dumps(container_info, indent=2)
+            })
+            
+            # Parse instructions and extract data
+            try:
+                instructions = json.loads(result.strip().replace('```json', '').replace('```', ''))
+                return self._extract_from_div_container(data_containers, instructions)
+            except:
+                raise ValueError("Could not parse div extraction instructions")
+                
+        except Exception as e:
+            raise ValueError(f"Failed to extract from div structure: {str(e)}")
+    
+    def _extract_from_div_container(self, containers: List, instructions: Dict) -> pd.DataFrame:
+        """
+        Extract data from div container using provided instructions
+        """
+        container_idx = instructions.get('container_index', 0)
+        if container_idx >= len(containers):
+            container_idx = 0
+        
+        container = containers[container_idx]
+        row_selector = instructions.get('row_selector', 'div')
+        cell_selector = instructions.get('cell_selector', 'span, div')
+        headers = instructions.get('headers', [])
+        
+        # Extract rows
+        rows = container.select(row_selector)
+        data_rows = []
+        
+        for row in rows:
+            cells = row.select(cell_selector) if cell_selector else [row]
+            cell_data = [cell.get_text(strip=True) for cell in cells]
+            if cell_data and any(cell_data):  # Only add non-empty rows
+                data_rows.append(cell_data)
+        
+        if not data_rows:
+            raise ValueError("No data rows extracted from div container")
+        
+        # Create DataFrame
+        if headers and len(headers) == len(data_rows[0]):
+            df = pd.DataFrame(data_rows, columns=headers)
+        else:
+            # Auto-generate column names
+            max_cols = max(len(row) for row in data_rows) if data_rows else 0
+            columns = [f"Column_{i}" for i in range(max_cols)]
+            # Pad rows to match column count
+            padded_rows = [row + [''] * (max_cols - len(row)) for row in data_rows]
+            df = pd.DataFrame(padded_rows, columns=columns)
+        
+        return df
+    
+    def _fallback_table_extraction(self, soup, task_description: str) -> pd.DataFrame:
+        """
+        Ultimate fallback: traditional table extraction
+        """
+        print("Using fallback table extraction method...")
+        
+        # Try pandas.read_html on the entire page
+        try:
+            tables = pd.read_html(str(soup))
+            if tables:
+                # Use simple heuristics to select best table
+                best_table = max(tables, key=lambda t: t.shape[0] * t.shape[1])
+                return best_table
+        except:
+            pass
+        
+        # Manual extraction from any table-like structure
+        rows = soup.find_all("tr")
+        if rows:
+            extracted = []
+            for row in rows:
+                cells = row.find_all(["th", "td"])
+                if cells:
+                    extracted.append([cell.get_text(strip=True) for cell in cells])
+            
+            if extracted:
+                # Use first row as header if consistent column count
+                if len(extracted) > 1 and len(extracted[0]) == len(extracted[1]):
+                    df = pd.DataFrame(extracted[1:], columns=extracted[0])
+                else:
+                    df = pd.DataFrame(extracted)
+                return df
+        
+        raise ValueError("Could not extract any tabular data from the webpage")
+
+    def _select_best_table_with_llm(self, tables: List[pd.DataFrame], task_description: str = '', keywords: List[str] = None) -> int:
         """
         Use LLM to intelligently select the most relevant table for analysis
         Based on task description and table previews
@@ -93,6 +849,7 @@ class ScrapeTableStep:
             Respond with ONLY the table index number (0, 1, 2, etc.) that best matches the analysis requirements."""
             
             human_prompt = """Task: {task_description}
+Keywords/entities: {keywords}
 
 Available tables:
 {table_info}
@@ -120,6 +877,7 @@ Respond with just the number."""
             # Invoke LLM with table data
             result = chain.invoke({
                 "task_description": task_description or "general data analysis",
+                "keywords": ', '.join(keywords) if keywords else '',
                 "table_info": table_info_str,
                 "max_index": len(tables) - 1
             })
@@ -204,7 +962,9 @@ class InspectTableStep:
             print(f"Flattened columns: {data.columns.tolist()}")
         
         # LLM-powered header detection for generic web scraping
-        first_row_is_header, header_row_idx = self._detect_headers_with_llm(data, input_data.get('task_description', ''))
+        task_description = input_data.get('task_description', '')
+        keywords = extract_keywords(task_description)
+        first_row_is_header, header_row_idx = self._detect_headers_with_llm(data, task_description, keywords)
         
         # Apply header detection results
         if first_row_is_header and header_row_idx is not None:
@@ -226,7 +986,7 @@ class InspectTableStep:
         
         return sanitize_for_json({'data': data})
     
-    def _detect_headers_with_llm(self, data: pd.DataFrame, task_description: str = '') -> tuple:
+    def _detect_headers_with_llm(self, data: pd.DataFrame, task_description: str = '', keywords: List[str] = None) -> tuple:
         """
         Use LLM to intelligently detect if any row contains headers
         Returns (is_header, row_index) tuple
@@ -251,6 +1011,7 @@ class InspectTableStep:
             Respond with ONLY the row index (0, 1, 2) that contains headers, or "NONE" if no headers are found in the data rows."""
             
             human_prompt = """Task: {task_description}
+Keywords/entities: {keywords}
 
 Table sample (first {rows_count} rows):
 {table_sample}
@@ -270,6 +1031,7 @@ Respond with just the number or "NONE"."""
             
             result = chain.invoke({
                 "task_description": task_description or "general data analysis",
+                "keywords": ', '.join(keywords) if keywords else '',
                 "table_sample": table_sample,
                 "rows_count": rows_to_check,
                 "current_columns": data.columns.tolist()
@@ -332,12 +1094,16 @@ class CleanDataStep:
         print(f"Original data types:\n{data.dtypes}")
         
         # Clean each column
+        task_description = input_data.get('task_description', '')
+        keywords = extract_keywords(task_description)
         for col in data.columns:
             if data[col].dtype == 'object':
                 print(f"\nCleaning column: {col}")
                 # Convert to string first
                 cleaned = data[col].astype(str)
                 
+                # LLM-guided cleaning (inject keywords/entities)
+                # Could be enhanced to call LLM for cleaning strategy
                 # Remove common symbols and formatting (generic for various data types)
                 cleaned = cleaned.str.replace('$', '', regex=False)  # Currency
                 cleaned = cleaned.str.replace(',', '', regex=False)  # Thousands separator
@@ -433,7 +1199,9 @@ class AnalyzeDataStep:
             return {'top_n_df': pd.DataFrame(), 'analysis_col': None}
         
         # LLM-powered column selection for analysis
-        best_col = self._select_analysis_column_with_llm(data, numeric_cols, input_data.get('task_description', ''))
+        task_description = input_data.get('task_description', '')
+        keywords = extract_keywords(task_description)
+        best_col = self._select_analysis_column_with_llm(data, numeric_cols, task_description, keywords)
         
         if not best_col:
             print("ERROR: No suitable column found for analysis")
@@ -476,7 +1244,7 @@ class AnalyzeDataStep:
         data_clean = data_clean.where(pd.notnull(data_clean), None)
         return sanitize_for_json({'top_n_df': top_n_df, 'analysis_col': best_col, 'name_col': name_col, 'data_clean': data_clean})
     
-    def _select_analysis_column_with_llm(self, data: pd.DataFrame, numeric_cols: List[str], task_description: str = '') -> str:
+    def _select_analysis_column_with_llm(self, data: pd.DataFrame, numeric_cols: List[str], task_description: str = '', keywords: List[str] = None) -> str:
         """
         Use LLM to intelligently select the most relevant numeric column for analysis
         """
@@ -511,6 +1279,7 @@ class AnalyzeDataStep:
             Respond with ONLY the exact column name."""
             
             human_prompt = """Task: {task_description}
+Keywords/entities: {keywords}
 
 Available numeric columns:
 {column_descriptions}
@@ -527,6 +1296,7 @@ Which column is most relevant for this analysis? Respond with just the column na
             
             result = chain.invoke({
                 "task_description": task_description or "general data analysis",
+                "keywords": ', '.join(keywords) if keywords else '',
                 "column_descriptions": "\n".join(column_info)
             })
             
@@ -695,7 +1465,8 @@ class VisualizeStep:
         name_col = input_data.get('name_col')
         data_clean = input_data.get('data_clean')
         task_description = input_data.get('task_description', '')
-        chart_type = input_data.get('chart_type', self._auto_detect_chart_type(task_description, data_clean))
+        keywords = extract_keywords(task_description)
+        chart_type = input_data.get('chart_type', self._auto_detect_chart_type(task_description, data_clean, keywords))
         
         if top_n_df is None or top_n_df.empty or analysis_col is None:
             print("No data available for visualization.")
@@ -828,7 +1599,7 @@ class VisualizeStep:
             print(f"Error creating visualization: {e}")
             return {'plot_path': None, 'plot_base64': None, 'error': str(e)}
     
-    def _auto_detect_chart_type(self, task_description: str, data_clean) -> str:
+    def _auto_detect_chart_type(self, task_description: str, data_clean, keywords: List[str] = None) -> str:
         """Auto-detect the appropriate chart type based on task description using LLM"""
         try:
             from langchain.prompts import ChatPromptTemplate
@@ -856,6 +1627,7 @@ Consider:
 Respond with ONLY one of: bar, scatter, histogram, time_series"""
 
             human_prompt = """Task: {task_description}
+Keywords/entities: {keywords}
 
 Data characteristics:
 - Numeric columns: {numeric_cols}
@@ -874,6 +1646,7 @@ What chart type is most appropriate? Respond with just: bar, scatter, histogram,
             
             result = chain.invoke({
                 "task_description": task_description,
+                "keywords": ', '.join(keywords) if keywords else '',
                 "numeric_cols": numeric_cols[:5],  # Limit for context
                 "text_cols": text_cols[:3],
                 "data_shape": f"{data_clean.shape[0]} rows, {data_clean.shape[1]} columns"

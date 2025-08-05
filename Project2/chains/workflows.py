@@ -1095,11 +1095,12 @@ class ModularWebScrapingWorkflow(BaseWorkflow):
     async def execute(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """Execute modular web scraping workflow using step classes"""
         try:
-            logger.info("Executing ModularWebScrapingWorkflow (fallback mode)")
+            logger.info("Executing ModularWebScrapingWorkflow with enhanced format detection")
             
             # Import the step classes from web_scraping_steps
             try:
                 from .web_scraping_steps import (
+                    DetectDataFormatStep,
                     ScrapeTableStep,
                     InspectTableStep,
                     CleanDataStep,
@@ -1133,12 +1134,19 @@ class ModularWebScrapingWorkflow(BaseWorkflow):
             data = {'task_description': task_description}  # Pass task description to all steps
             
             try:
-                # Step 1: Scrape table
+                # Step 0: Detect data format (NEW)
+                step0 = DetectDataFormatStep()
+                step0_input = {'url': url, 'task_description': task_description}
+                step0_result = step0.run(step0_input)
+                data.update(step0_result)
+                execution_log.append("✓ Data format detection completed")
+                
+                # Step 1: Enhanced data extraction
                 step1 = ScrapeTableStep()
-                step1_input = {'url': url, 'task_description': task_description}
+                step1_input = {**data, 'url': url, 'task_description': task_description}
                 step1_result = step1.run(step1_input)
                 data.update(step1_result)
-                execution_log.append("✓ Table scraping completed")
+                execution_log.append("✓ Data extraction completed")
                 
                 # Step 2: Inspect table
                 step2 = InspectTableStep()
@@ -1353,6 +1361,7 @@ class AdvancedWorkflowOrchestrator(WorkflowOrchestrator):
 
 # Import new web scraping steps
 from .web_scraping_steps import (
+    DetectDataFormatStep,
     ScrapeTableStep,
     InspectTableStep,
     CleanDataStep,
@@ -1363,6 +1372,7 @@ from .web_scraping_steps import (
 
 # --- Step Registry (updated to include new web scraping steps) ---
 STEP_REGISTRY = {
+    'detect_format': DetectDataFormatStep,
     'scrape_table': ScrapeTableStep,
     'inspect_table': InspectTableStep,
     'clean_data': CleanDataStep,
