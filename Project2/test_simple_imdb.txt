@@ -1,3 +1,0 @@
-Scrape IMDb top 10 movies from:
-https://www.imdb.com/chart/top
-Extract movie ratings and create a simple analysis.
