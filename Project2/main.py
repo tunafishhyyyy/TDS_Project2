@@ -136,56 +136,6 @@ class TaskResponse(BaseModel):  # Model for task response
     workflow_result: Optional[Dict[str, Any]] = Field(None, description="LangChain workflow execution result")
 
 
-def prepare_workflow_parameters(task_description: str, workflow_type: str, file_content: str = None) -> Dict[str, Any]:  # Prepare workflow-specific parameters
-    """Prepare workflow-specific parameters based on task and content"""
-    parameters = {}
-    
-    if workflow_type == "data_analysis":
-        legal_keywords = [
-            "court", "judgment", "legal", "case", "disposal", "judge",
-            "cnr", "ecourts", "high court"
-        ]
-        if any(kw in task_description.lower() for kw in legal_keywords):
-            parameters.update({
-                "court_context": "Indian High Courts",
-                "dataset_info": {
-                    "type": "legal_judgments",
-                    "source": "ecourts.gov.in",
-                    "columns": [
-                        "court_code", "title", "description", "judge",
-                        "pdf_link", "cnr", "date_of_registration",
-                        "decision_date", "disposal_nature"
-                    ]
-                }
-            })
-    elif workflow_type == "wikipedia_scraping":
-        # Extract Wikipedia URL if present
-        url_match = re.search(r'https?://[^\s]+wikipedia[^\s]+', task_description)
-        if url_match:
-            parameters["wikipedia_url"] = url_match.group()
-        
-        parameters.update({
-            "target_data_description": "table data extraction",
-            "analysis_goals": "statistical analysis and visualization"
-        })
-    
-    elif workflow_type == "statistical_analysis":
-        parameters.update({
-            "statistical_methods": "correlation, regression, trend analysis",
-            "variables": ["rank", "peak", "revenue", "year"]
-        })
-    
-    elif workflow_type == "database_analysis":
-        parameters.update({
-            "database_type": "DuckDB",
-            "data_source": "S3/Parquet files",
-            "schema_info": {
-                "court_data": ["court_code", "title", "judge", "date_of_registration", "decision_date"]
-            }
-        })
-    
-    return parameters
-
 def extract_output_requirements(task_description: str) -> Dict[str, Any]:  # Extract output requirements from task description
     """Extract specific output requirements from task description"""
     requirements = {
@@ -224,7 +174,9 @@ async def detect_workflow_type_llm(task_description: str, default_workflow: str 
     if not task_description:
         return default_workflow
     
-    logger.info(f"Detecting workflow type for task: {task_description[:100]}...")
+    logger.info(
+        f"Detecting workflow type for task: {task_description[:100]}..."
+    )
     
     try:
         if orchestrator and orchestrator.llm:
@@ -235,20 +187,22 @@ async def detect_workflow_type_llm(task_description: str, default_workflow: str 
                 ("system", """You are an expert workflow classifier for data analysis tasks. 
                 Analyze the task description and classify it into one of these workflow types:
                 
-                - data_analysis: General data analysis and recommendations (including legal/court data)
-                - image_analysis: Image processing, computer vision, or image-based analysis
-                - code_generation: Generate Python code for data analysis tasks
-                - exploratory_data_analysis: Comprehensive EDA planning and execution
+                - data_analysis: General data analysis and recommendations
+                - image_analysis: Image processing, computer vision
+                - code_generation: Generate Python code for analysis
+                - exploratory_data_analysis: Comprehensive EDA planning
                 - predictive_modeling: Machine learning model development
-                - data_visualization: Creating charts, graphs, and visualizations
-                - web_scraping: Extract data from websites or web pages (including Wikipedia)
-                - multi_step_web_scraping: Multi-step web scraping with data cleaning, analysis, and visualization
-                - database_analysis: SQL analysis using databases like DuckDB
-                - statistical_analysis: Statistical analysis including correlation and regression
+                - data_visualization: Creating charts, graphs, visualizations
+                - web_scraping: Extract data from websites
+                - multi_step_web_scraping: Multi-step web scraping with analysis
+                - database_analysis: SQL analysis using databases
+                - statistical_analysis: Statistical analysis, correlation, regression
                 - text_analysis: Natural language processing and text analytics
                 
-                IMPORTANT: If the task involves web scraping AND multiple steps (scraping, cleaning, analysis, visualization, answering questions), use 'multi_step_web_scraping'.
-                If it's just basic web scraping without complex analysis, use 'web_scraping'.
+                IMPORTANT: If the task involves web scraping AND multiple steps 
+                (scraping, cleaning, analysis, visualization, answering questions), 
+                use 'multi_step_web_scraping'. If it's just basic web scraping 
+                without complex analysis, use 'web_scraping'.
                 
                 Return ONLY the workflow type name, nothing else."""),
                 ("human", "Task: {task_description}")
@@ -264,26 +218,39 @@ async def detect_workflow_type_llm(task_description: str, default_workflow: str 
             valid_workflows = [
                 "data_analysis", "image_analysis", "code_generation", 
                 "exploratory_data_analysis", "predictive_modeling", 
-                "data_visualization", "web_scraping", "multi_step_web_scraping", 
-                "database_analysis", "statistical_analysis", "text_analysis"
+                "data_visualization", "web_scraping", 
+                "multi_step_web_scraping", "database_analysis", 
+                "statistical_analysis", "text_analysis"
             ]
             
             if detected_workflow in valid_workflows:
                 logger.info(f"LLM detected workflow type: {detected_workflow}")
                 return detected_workflow
             else:
-                logger.warning(f"LLM returned invalid workflow: {detected_workflow}, using fallback")
-                return detect_workflow_type_fallback(task_description, default_workflow)
+                logger.warning(
+                    f"LLM returned invalid workflow: {detected_workflow}, "
+                    f"using fallback"
+                )
+                return detect_workflow_type_fallback(
+                    task_description, default_workflow
+                )
                 
         else:
-            logger.warning("LLM not available, using fallback workflow detection")
-            return detect_workflow_type_fallback(task_description, default_workflow)
+            logger.warning(
+                "LLM not available, using fallback workflow detection"
+            )
+            return detect_workflow_type_fallback(
+                task_description, default_workflow
+            )
             
     except Exception as e:
         logger.error(f"Error in LLM workflow detection: {e}")
         return detect_workflow_type_fallback(task_description, default_workflow)
 
-def detect_workflow_type_fallback(task_description: str, default_workflow: str = "data_analysis") -> str:  # Fallback keyword-based workflow detection
+def detect_workflow_type_fallback(
+    task_description: str, 
+    default_workflow: str = "data_analysis"
+) -> str:  # Fallback keyword-based workflow detection
     """
     Fallback keyword-based workflow detection when LLM is not available
     """
@@ -292,7 +259,8 @@ def detect_workflow_type_fallback(task_description: str, default_workflow: str =
     
     task_lower = task_description.lower()
     
-    # Web scraping patterns (including specific domains) - PRIORITIZE BEFORE IMAGE ANALYSIS
+    # Web scraping patterns (including specific domains) 
+    # PRIORITIZE BEFORE IMAGE ANALYSIS
     if any(
         keyword in task_lower
         for keyword in [
@@ -301,7 +269,8 @@ def detect_workflow_type_fallback(task_description: str, default_workflow: str =
             'espn', 'cricinfo', 'website', 'url', 'html'
         ]
     ):
-        # Check if it involves multiple steps (cleaning, analysis, visualization, questions)
+        # Check if it involves multiple steps 
+        # (cleaning, analysis, visualization, questions)
         if any(
             keyword in task_lower
             for keyword in [
@@ -407,59 +376,53 @@ def detect_workflow_type_fallback(task_description: str, default_workflow: str =
     
     return default_workflow
 
-def prepare_workflow_parameters(task_description: str, workflow_type: str, file_content: str = None) -> Dict[str, Any]:  # Prepare parameters for workflow execution
+def prepare_workflow_parameters(
+    task_description: str, 
+    workflow_type: str, 
+    file_content: str = None
+) -> Dict[str, Any]:  # Prepare parameters for workflow execution
     """
     Prepare specific parameters based on workflow type and task description
     """
     params = {}
     task_lower = task_description.lower() if task_description else ""
     
-    if workflow_type == "wikipedia_analysis":
-        # Extract Wikipedia URLs or topics
-        if "wikipedia.org" in task_lower:
-            import re
-            urls = re.findall(r'https?://[^\s]+wikipedia[^\s]+', task_description)
-            params["target_urls"] = urls
-        if "highest grossing" in task_lower:
-            params["data_type"] = "movie_revenue"
-            params["table_indicators"] = ["rank", "peak", "film", "gross"]
+    # Generic URL extraction
+    if "http" in task_lower:
+        import re
+        urls = re.findall(r'https?://[^\s]+', task_description)
+        params["target_urls"] = urls
     
-    elif workflow_type == "database_analysis":
-        # DuckDB and S3 parameters
-        if "s3://" in task_lower:
-            import re
-            s3_paths = re.findall(r's3://[^\s]+', task_description)
-            params["s3_paths"] = s3_paths
-        if "duckdb" in task_lower:
-            params["database_type"] = "duckdb"
-        if "parquet" in task_lower:
-            params["file_format"] = "parquet"
-        if "high court" in task_lower:
-            params["domain"] = "legal_judgments"
-            params["table_schema"] = {
-                "court_code": "VARCHAR",
-                "title": "VARCHAR", 
-                "judge": "VARCHAR",
-                "decision_date": "DATE",
-                "disposal_nature": "VARCHAR"
-            }
+    # Generic data type detection
+    if any(kw in task_lower for kw in ["gross", "revenue", "profit"]):
+        params["data_type"] = "financial"
+    elif any(kw in task_lower for kw in ["rank", "position", "top"]):
+        params["data_type"] = "ranking"
     
-    elif workflow_type == "data_visualization":
-        # Visualization parameters
-        if "scatterplot" in task_lower:
-            params["chart_type"] = "scatter"
-        if "regression line" in task_lower:
-            params["include_regression"] = True
-        if "base64" in task_lower or "data uri" in task_lower:
-            params["output_format"] = "base64_uri"
-            params["max_size"] = 100000  # 100KB limit
-        if "dotted red" in task_lower:
-            params["line_style"] = {"color": "red", "style": "dotted"}
+    # Database parameters (generic)
+    if "s3://" in task_lower:
+        import re
+        s3_paths = re.findall(r's3://[^\s]+', task_description)
+        params["s3_paths"] = s3_paths
+    if any(kw in task_lower for kw in ["duckdb", "sql", "database"]):
+        params["database_type"] = "sql_based"
+    if "parquet" in task_lower:
+        params["file_format"] = "parquet"
     
-    # Add file content analysis
+    # Visualization parameters (generic)
+    if "scatterplot" in task_lower or "scatter" in task_lower:
+        params["chart_type"] = "scatter"
+    if "regression" in task_lower:
+        params["include_regression"] = True
+    if "base64" in task_lower or "data uri" in task_lower:
+        params["output_format"] = "base64_uri"
+        params["max_size"] = 100000  # 100KB limit
+    
+    # File content analysis
     if file_content:
         params["file_content_length"] = len(file_content)
-        if file_content.strip().startswith('{') or file_content.strip().startswith('['):
+        content_stripped = file_content.strip()
+        if content_stripped.startswith(('{', '[')):
             params["content_type"] = "json"
         elif '\t' in file_content or ',' in file_content:
             params["content_type"] = "csv"
@@ -514,10 +477,16 @@ async def analyze_data(
         logger.info(f"Starting synchronous task {task_id}")
         
         # Process required questions.txt file
-        if not questions_txt.filename.lower().endswith('.txt') or 'question' not in questions_txt.filename.lower():
+        if not (
+            questions_txt.filename.lower().endswith('.txt') or 
+            'question' in questions_txt.filename.lower()
+        ):
             raise HTTPException(
                 status_code=400,
-                detail="questions.txt file is required and must be named appropriately (must contain 'question' in filename)"
+                detail=(
+                    "questions.txt file is required and must be named "
+                    "appropriately (must contain 'question' in filename)"
+                )
             )
         
         questions_content = await questions_txt.read()
@@ -537,20 +506,29 @@ async def analyze_data(
                     logger.info(f"Processed text file: {file.filename}")
                 except UnicodeDecodeError:
                     # Handle binary files (images, etc.)
-                    file_contents[file.filename] = f"Binary file: {file.filename} ({len(content)} bytes)"
-                    logger.info(f"Processed binary file: {file.filename} ({len(content)} bytes)")
+                    file_contents[file.filename] = (
+                        f"Binary file: {file.filename} ({len(content)} bytes)"
+                    )
+                    logger.info(
+                        f"Processed binary file: {file.filename} "
+                        f"({len(content)} bytes)"
+                    )
                 
                 processed_files[file.filename] = {
                     "content_type": file.content_type,
                     "size": len(content),
-                    "is_text": file.filename.endswith(('.txt', '.csv', '.json', '.md'))
+                    "is_text": file.filename.endswith((
+                        '.txt', '.csv', '.json', '.md'
+                    ))
                 }
         
         # Use questions as task description (content of questions.txt)
         task_description = questions_text
         
         # Intelligent workflow type detection using LLM
-        detected_workflow = await detect_workflow_type_llm(task_description, "multi_step_web_scraping")
+        detected_workflow = await detect_workflow_type_llm(
+            task_description, "multi_step_web_scraping"
+        )
         logger.info(f"Detected workflow: {detected_workflow}")
         logger.info(f"Task description: {task_description[:200]}...")
         
@@ -561,15 +539,22 @@ async def analyze_data(
             "additional_files": file_contents,
             "processed_files_info": processed_files,
             "workflow_type": detected_workflow,
-            "parameters": prepare_workflow_parameters(task_description, detected_workflow, questions_text),
-            "output_requirements": extract_output_requirements(task_description)
+            "parameters": prepare_workflow_parameters(
+                task_description, detected_workflow, questions_text
+            ),
+            "output_requirements": extract_output_requirements(
+                task_description
+            )
         }
         
         logger.info(f"Workflow input prepared with {len(workflow_input)} keys")
         logger.info(f"Additional files: {list(file_contents.keys())}")
         
         # Execute workflow synchronously (always within 3 minutes)
-        logger.info(f"Processing task {task_id} synchronously with workflow: {detected_workflow}")
+        logger.info(
+            f"Processing task {task_id} synchronously with "
+            f"workflow: {detected_workflow}"
+        )
         
         try:
             logger.info(f"Starting workflow execution for {detected_workflow}")
@@ -579,7 +564,9 @@ async def analyze_data(
             )
             
             logger.info(f"Task {task_id} completed successfully")
-            logger.info(f"Result keys: {list(result.keys()) if isinstance(result, dict) else 'Not a dict'}")
+            logger.info(
+                f"Result keys: {list(result.keys()) if isinstance(result, dict) else 'Not a dict'}"
+            )
             
             return {
                 "task_id": task_id,
@@ -599,7 +586,10 @@ async def analyze_data(
             logger.error(f"Task {task_id} timed out after 3 minutes")
             raise HTTPException(
                 status_code=408, 
-                detail="Request timed out after 3 minutes. Please simplify your request or try again."
+                detail=(
+                    "Request timed out after 3 minutes. Please simplify "
+                    "your request or try again."
+                )
             )
         except Exception as e:
             logger.error(f"Task {task_id} failed: {e}")
@@ -612,9 +602,16 @@ async def analyze_data(
         raise
     except Exception as e:
         logger.error(f"Error processing request: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error processing request: {str(e)}")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Error processing request: {str(e)}"
+        )
 
-async def execute_workflow_sync(workflow_type: str, workflow_input: Dict[str, Any], task_id: str) -> Dict[str, Any]:  # Execute workflow synchronously
+async def execute_workflow_sync(
+    workflow_type: str, 
+    workflow_input: Dict[str, Any], 
+    task_id: str
+) -> Dict[str, Any]:  # Execute workflow synchronously
     """Execute workflow synchronously with enhanced error handling"""
     try:
         if orchestrator is None:
@@ -623,8 +620,15 @@ async def execute_workflow_sync(workflow_type: str, workflow_input: Dict[str, An
                 "workflow_type": workflow_type,
                 "status": "completed_fallback",
                 "message": "Orchestrator not available, using fallback response",
-                "task_analysis": f"Detected workflow: {workflow_type} for questions: {workflow_input.get('questions', '')[:100]}...",
-                "recommendations": ["Check workflow initialization", "Install required dependencies", "Configure OpenAI API key"],
+                "task_analysis": (
+                    f"Detected workflow: {workflow_type} for questions: "
+                    f"{workflow_input.get('questions', '')[:100]}..."
+                ),
+                "recommendations": [
+                    "Check workflow initialization", 
+                    "Install required dependencies", 
+                    "Configure OpenAI API key"
+                ],
                 "parameters_prepared": workflow_input.get("parameters", {}),
                 "files_processed": list(workflow_input.get("additional_files", {}).keys())
             }
@@ -633,7 +637,10 @@ async def execute_workflow_sync(workflow_type: str, workflow_input: Dict[str, An
             logger.info(f"Available workflows: {list(orchestrator.workflows.keys())}")
             
             if workflow_type not in orchestrator.workflows:
-                logger.warning(f"Workflow {workflow_type} not found, available: {list(orchestrator.workflows.keys())}")
+                logger.warning(
+                    f"Workflow {workflow_type} not found, available: "
+                    f"{list(orchestrator.workflows.keys())}"
+                )
                 return {
                     "workflow_type": workflow_type,
                     "status": "error",
@@ -641,8 +648,13 @@ async def execute_workflow_sync(workflow_type: str, workflow_input: Dict[str, An
                     "available_workflows": list(orchestrator.workflows.keys())
                 }
             
-            result = await orchestrator.execute_workflow(workflow_type, workflow_input)
-            logger.info(f"Workflow {workflow_type} executed successfully for task {task_id}")
+            result = await orchestrator.execute_workflow(
+                workflow_type, workflow_input
+            )
+            logger.info(
+                f"Workflow {workflow_type} executed successfully for "
+                f"task {task_id}"
+            )
             logger.info(f"Result type: {type(result)}")
             if isinstance(result, dict):
                 logger.info(f"Result keys: {list(result.keys())}")
