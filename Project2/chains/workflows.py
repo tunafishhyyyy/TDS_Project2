@@ -800,8 +800,9 @@ if isinstance(data.columns, pd.MultiIndex):
     print("\\nFlattened MultiIndex columns:")
     print(f"Columns: {{data.columns.tolist()}}")
 
-# Check if first row contains headers
-if data.iloc[0].dtype == 'object':
+# Check if first row contains headers (check if most values in first row are strings)
+first_row_object_cols = sum(1 for col in data.columns if data[col].iloc[0] is not None and isinstance(data[col].iloc[0], str))
+if first_row_object_cols > len(data.columns) / 2:
     # Use first row as headers
     data.columns = data.iloc[0]
     data = data[1:].reset_index(drop=True)

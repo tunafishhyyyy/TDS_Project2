@@ -163,7 +163,7 @@ def detect_workflow_type(task_description: str, default_workflow: str = "data_an
     
     # Web scraping patterns
     if any(keyword in task_lower for keyword in ['scrape', 'extract', 'web', 'html', 'website']):
-        return "web_scraping"
+        return "multi_step_web_scraping"
     
     return default_workflow
 
@@ -322,13 +322,13 @@ def detect_workflow_type_fallback(task_description: str, default_workflow: str =
     if any(keyword in task_lower for keyword in ['court', 'judgment', 'legal', 'case', 'disposal', 'judge', 'cnr', 'ecourts']):
         return "data_analysis"
     
-    # Wikipedia patterns with multi-step analysis - map to multi-step web scraping
-    if any(keyword in task_lower for keyword in ['wikipedia', 'wiki', 'scrape', 'list of', 'table from']):
+    # Web scraping patterns (including specific domains)
+    if any(keyword in task_lower for keyword in ['wikipedia', 'wiki', 'scrape', 'list of', 'table from', 'coronavirus', 'worldometers', 'imdb', 'tradingeconomics', 'espn', 'cricinfo', 'website', 'url', 'html']):
         # Check if it involves multiple steps (cleaning, analysis, visualization, questions)
-        if any(keyword in task_lower for keyword in ['clean', 'plot', 'top 10', 'rank', 'total', 'answer', 'question']):
+        if any(keyword in task_lower for keyword in ['clean', 'plot', 'top 10', 'rank', 'total', 'answer', 'question', 'extract', 'analyze', 'visualization']):
             return "multi_step_web_scraping"
         else:
-            return "web_scraping"
+            return "multi_step_web_scraping"
     
     # Statistical analysis patterns
     if any(keyword in task_lower for keyword in ['correlation', 'regression', 'statistical', 'trend', 'slope']):
@@ -356,7 +356,7 @@ def detect_workflow_type_fallback(task_description: str, default_workflow: str =
     
     # Web scraping patterns
     if any(keyword in task_lower for keyword in ['scrape', 'extract', 'web', 'html', 'website']):
-        return "web_scraping"
+        return "multi_step_web_scraping"
     
     return default_workflow
 
@@ -503,7 +503,7 @@ async def analyze_data(
         task_description = questions_text
         
         # Intelligent workflow type detection using LLM
-        detected_workflow = await detect_workflow_type_llm(task_description, "data_analysis")
+        detected_workflow = await detect_workflow_type_llm(task_description, "multi_step_web_scraping")
         logger.info(f"Detected workflow: {detected_workflow}")
         logger.info(f"Task description: {task_description[:200]}...")
         

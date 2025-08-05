@@ -1,3 +1,50 @@
+Example 2:
+---------
+Scrape IMDb Ratings for Top Movies
+Scrape the top 50 movies from:
+https://www.imdb.com/chart/top
+Then:
+Extract movie name, year, rating.
+Create a histogram of IMDb ratings.
+Answer:
+What is the average rating?
+Which decade has the most top-rated movies?
+
+Example 3:
+=========
+Scrape Inflation Data from Trading Economics
+Instruction to Agent:
+Scrape inflation rate data for India from:
+👉 https://tradingeconomics.com/india/inflation-cpi
+Then:
+Plot a time series of inflation over the last 12 months.
+Answer:
+What is the current inflation rate?
+What was the highest rate in the last year?
+
+Example 4: Scrape COVID-19 Cases Data
+======
+Instruction to Agent:
+Scrape the table from:
+👉 https://www.worldometers.info/coronavirus/
+Then:
+Extract top 20 countries by total cases.
+Plot total cases vs. deaths (scatter plot).
+Answer:
+Which country has the highest death-to-case ratio?
+What's the global average recovery rate?
+
+Example 5: Scrape Cricket Stats from ESPN Cricinfo
+Instruction to Agent:
+Scrape top 10 batsmen from:
+👉 https://stats.espncricinfo.com/ci/content/records/
+Then:
+Extract player name, country, total runs, average.
+Plot total runs vs batting average.
+Answer:
+Who has the highest average among players with over 8000 runs?
+Which country has the most players in top 10?
+
 
 == Notes ==
 * While running in Agent mode Pls do not run the commands on this machine directly the actual python code and API server runs inside a Docker container, Direct commands will not work.

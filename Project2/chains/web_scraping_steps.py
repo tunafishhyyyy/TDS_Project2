@@ -84,18 +84,18 @@ class DetectDataFormatStep:
             if format_analysis.get('json_data'):
                 print(f"JSON data found: {len(format_analysis['json_data'])} characters")
             
-            return sanitize_for_json({
+            return {
                 'url': url,
                 'task_description': task_description,
                 'format_analysis': format_analysis,
                 'html_content': response.text,
-                'soup': soup  # Pass soup object for next steps
-            })
+                'soup': soup  # Pass soup object for next steps (not serialized)
+            }
             
         except Exception as e:
             print(f"Error in data format detection: {str(e)}")
             # Fallback to traditional table scraping
-            return sanitize_for_json({
+            return {
                 'url': url,
                 'task_description': task_description,
                 'format_analysis': {
@@ -104,7 +104,7 @@ class DetectDataFormatStep:
                     'confidence': 'low',
                     'fallback': True
                 }
-            })
+            }
     
     def _analyze_data_format_with_llm(self, soup: BeautifulSoup, task_description: str, url: str) -> Dict[str, Any]:
         """
@@ -318,6 +318,9 @@ class ScrapeTableStep:
         
         print(f"Extracting data using strategy: {format_analysis.get('strategy', 'pandas_read_html')}")
         
+        soup = None
+        html_content = ""
+        
         try:
             # Use existing soup if available, otherwise fetch fresh content
             if 'soup' in input_data:
@@ -346,6 +349,22 @@ class ScrapeTableStep:
         except Exception as e:
             print(f"Error in primary extraction strategy: {str(e)}")
             print("Falling back to traditional table scraping...")
+            
+            # Ensure we have soup for fallback
+            if soup is None:
+                try:
+                    headers = {
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
+                        "Accept-Language": "en-US,en;q=0.9",
+                        "Referer": "https://www.google.com/"
+                    }
+                    response = requests.get(url, headers=headers)
+                    response.raise_for_status()
+                    soup = BeautifulSoup(response.text, "html.parser")
+                except Exception as fallback_error:
+                    print(f"Failed to fetch content for fallback: {str(fallback_error)}")
+                    raise e  # Re-raise original error
+            
             data = self._fallback_table_extraction(soup, task_description)
             
         return sanitize_for_json({'data': data, 'url': url, 'format_analysis': format_analysis})
@@ -2128,20 +2147,28 @@ Respond with a JSON object containing relevant answers and insights."""
     
     def _answer_temporal_questions(self, answers: dict, data_clean, analysis_col: str, name_col: str, year_col: str):
         """Answer time-based questions"""
-        # Count items before year 2000
-        before_2000 = len(data_clean[data_clean[year_col] < 2000])
-        answers['items_before_2000'] = before_2000
-        print(f"Items before year 2000: {before_2000}")
-        
-        # Find earliest item above threshold (for financial data)
-        if 'billion' in str(analysis_col).lower():
-            above_threshold = data_clean[data_clean[analysis_col] > 1500].sort_values(year_col)
-            if len(above_threshold) > 0:
-                earliest_item = above_threshold.iloc[0][name_col]
-                earliest_year = above_threshold.iloc[0][year_col]
-                answers['earliest_above_threshold'] = earliest_item
-                answers['earliest_year'] = earliest_year
-                print(f"Earliest item above 1.5bn: {earliest_item} ({earliest_year})")
+        try:
+            # Ensure year column is numeric
+            data_clean[year_col] = pd.to_numeric(data_clean[year_col], errors='coerce')
+            
+            # Count items before year 2000
+            before_2000 = len(data_clean[data_clean[year_col] < 2000])
+            answers['items_before_2000'] = before_2000
+            print(f"Items before year 2000: {before_2000}")
+            
+            # Find earliest item above threshold (for financial data)
+            if 'billion' in str(analysis_col).lower():
+                above_threshold = data_clean[data_clean[analysis_col] > 1500].sort_values(year_col)
+                if len(above_threshold) > 0:
+                    earliest_item = above_threshold.iloc[0][name_col]
+                    earliest_year = above_threshold.iloc[0][year_col]
+                    answers['earliest_above_threshold'] = earliest_item
+                    answers['earliest_year'] = earliest_year
+                    print(f"Earliest item above 1.5bn: {earliest_item} ({earliest_year})")
+        except Exception as e:
+            print(f"Error in temporal analysis: {str(e)}")
+            # Set default values if temporal analysis fails
+            answers['items_before_2000'] = 0
     
     def _identify_data_type(self, analysis_col: str, task_description: str) -> str:
         """Identify the type of data being analyzed"""
