@@ -587,8 +587,8 @@ class ScrapeTableStep:
                 str(data_obj)[:1000] + "..." if len(str(data_obj)) > 1000 else str(data_obj)
             )
 
-            system_prompt = """You are a data extraction expert. Analyze the JSON structure and provide instructions for converting it to a tabular DataFrame.
-
+            system_prompt = """You are a data extraction expert. Analyze the JSON structure and provide
+            instructions for converting it to a tabular DataFrame.
 Identify:
 1. The path to the array/list containing the main data
 2. The key fields that should become DataFrame columns
@@ -703,9 +703,8 @@ Provide extraction instructions for converting this JSON to a DataFrame."""
                 if len(script) > 100:  # Only analyze substantial scripts
                     script_sample += script[:500] + "\n---\n"
 
-            system_prompt = """You are a JavaScript data extraction expert. Analyze script content to find data relevant to the task.
-
-Look for:
+            system_prompt = """You are a JavaScript data extraction expert. Analyze script content to find
+            data relevant to the task. Look for:
 1. Variable assignments with arrays/objects
 2. JSON data embedded in JavaScript
 3. API responses or data initialization
@@ -795,9 +794,9 @@ Extract the JavaScript code containing the relevant data for this task."""
                 }
                 container_info.append(info)
 
-            system_prompt = """You are a web scraping expert specializing in extracting tabular data from div-based layouts.
-
-Analyze the HTML structure and identify which container holds the relevant data. Then provide extraction instructions.
+            system_prompt = """You are a web scraping expert specializing in extracting tabular data from
+            div-based layouts. Analyze the HTML structure and identify which container holds the
+            relevant data. Then provide extraction instructions.
 
 Respond in JSON format:
 {{
@@ -1115,15 +1114,16 @@ class InspectTableStep:
             rows_to_check = min(3, len(data))
             table_sample = data.head(rows_to_check).to_string(max_cols=10)
 
-            system_prompt = """You are an expert data analyst. Examine the first few rows of a table and determine if any row contains column headers.
-
+            system_prompt = """You are an expert data analyst. Examine the first few rows of a
+            table and determine if any row contains column headers.
             Look for:
             1. Descriptive names instead of data values
             2. Text patterns typical of headers (Name, Rank, Total, etc.)
             3. Consistency with the analysis task
             4. Non-numeric values in what should be data rows
 
-            Respond with ONLY the row index (0, 1, 2) that contains headers, or "NONE" if no headers are found in the data rows."""
+            Respond with ONLY the row index (0, 1, 2) that contains headers,
+            or "NONE" if no headers are found in the data rows."""
 
             human_prompt = """Task: {task_description}
 Keywords/entities: {keywords}
@@ -1273,7 +1273,7 @@ class CleanDataStep:
                     3, total_count * 0.05
                 ):  # Lower threshold for small datasets
                     print(
-                        f"  Converted {valid_count} values to numeric ({valid_count/total_count*100:.1f}%)"
+                        f"  Converted {valid_count} values to numeric ({valid_count / total_count * 100:.1f}%)"
                     )
                     data[col] = numeric_data
 
@@ -1378,7 +1378,7 @@ class AnalyzeDataStep:
         for i, (idx, row) in enumerate(top_n_df.iterrows()):
             identifier = row[name_col]
             value = row[best_col]
-            print(f"{i+1:2d}. {identifier}: {value:,.2f}")
+            print(f"{i + 1:2d}. {identifier}: {value:,.2f}")
 
         # Replace inf/-inf with nan, then nan with None for JSON
         top_n_df = top_n_df.replace([np.inf, -np.inf], np.nan)
@@ -1534,7 +1534,8 @@ Which column is most relevant for this analysis? Respond with just the column na
             name_col = text_cols[0]
             sample_data = data.head(20)  # Look at first 20 rows
 
-            system_prompt = """You are a data cleaning expert. Examine the data rows and identify which ones are summary/total/aggregate rows that should be filtered out for analysis.
+            system_prompt = """You are a data cleaning expert. Examine the data rows and identify
+            which ones are summary/total/aggregate rows that should be filtered out for analysis.
 
 Look for rows that contain:
 - Total/sum values (like "Total", "World", "All Countries", "Overall")
@@ -1875,8 +1876,8 @@ class VisualizeStep:
             numeric_cols = data_clean.select_dtypes(include=[np.number]).columns.tolist()
             text_cols = data_clean.select_dtypes(include=["object"]).columns.tolist()
 
-            system_prompt = """You are a data visualization expert. Based on the task description and data characteristics,
-            recommend the most appropriate chart type.
+            system_prompt = """You are a data visualization expert. Based on the task description
+            and data characteristics, recommend the most appropriate chart type.
 
 Available chart types:
 - bar: For rankings, comparisons, top N items
