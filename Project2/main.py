@@ -27,7 +27,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'chains'))
+sys.path.append(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), 'chains')
+)
 try:
     from chains.workflows import AdvancedWorkflowOrchestrator
     orchestrator = AdvancedWorkflowOrchestrator()
@@ -83,7 +85,8 @@ async def root():  # Root endpoint with API info
             "12+ specialized workflows"
         ],
         "endpoints": {
-            "main": "/api/ (POST - multiple files with required questions.txt)",
+            "main": "/api/ (POST - multiple files with required "
+                   "questions.txt)",
             "health": "/health (GET)",
             "docs": "/docs (GET - Swagger UI)"
         },
@@ -107,36 +110,68 @@ async def health_check():  # Health check endpoint
 # Pydantic models for request/response
 class TaskRequest(BaseModel):  # Model for analysis task requests
     """Model for analysis task requests"""
-    task_description: str = Field(..., description="Description of the analysis task")
-    workflow_type: Optional[str] = Field("data_analysis", description="Type of workflow to execute")
-    data_source: Optional[str] = Field(None, description="Optional data source information")
-    dataset_info: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Dataset characteristics and metadata")
-    parameters: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Additional parameters for the task")
-    priority: Optional[str] = Field("normal", description="Task priority: low, normal, high")
-    include_modeling: Optional[bool] = Field(False, description="Include predictive modeling in analysis")
-    target_audience: Optional[str] = Field("technical team", description="Target audience for reports")
+    task_description: str = Field(
+        ..., description="Description of the analysis task"
+    )
+    workflow_type: Optional[str] = Field(
+        "data_analysis", description="Type of workflow to execute"
+    )
+    data_source: Optional[str] = Field(
+        None, description="Optional data source information"
+    )
+    dataset_info: Optional[Dict[str, Any]] = Field(
+        default_factory=dict, 
+        description="Dataset characteristics and metadata"
+    )
+    parameters: Optional[Dict[str, Any]] = Field(
+        default_factory=dict, description="Additional parameters for the task"
+    )
+    priority: Optional[str] = Field(
+        "normal", description="Task priority: low, normal, high"
+    )
+    include_modeling: Optional[bool] = Field(
+        False, description="Include predictive modeling in analysis"
+    )
+    target_audience: Optional[str] = Field(
+        "technical team", description="Target audience for reports"
+    )
 
 class WorkflowRequest(BaseModel):  # Model for specific workflow requests
     """Model for specific workflow requests"""
-    workflow_type: str = Field(..., description="Type of workflow to execute")
-    input_data: Dict[str, Any] = Field(..., description="Input data for the workflow")
+    workflow_type: str = Field(
+        ..., description="Type of workflow to execute"
+    )
+    input_data: Dict[str, Any] = Field(
+        ..., description="Input data for the workflow"
+    )
 
-class MultiStepWorkflowRequest(BaseModel):  # Model for multi-step workflow requests
+class MultiStepWorkflowRequest(BaseModel):
+    # Model for multi-step workflow requests
     """Model for multi-step workflow requests"""
-    steps: List[Dict[str, Any]] = Field(..., description="List of workflow steps to execute")
-    pipeline_type: Optional[str] = Field("custom", description="Type of pipeline")
+    steps: List[Dict[str, Any]] = Field(
+        ..., description="List of workflow steps to execute"
+    )
+    pipeline_type: Optional[str] = Field(
+        "custom", description="Type of pipeline"
+    )
 
 class TaskResponse(BaseModel):  # Model for task response
     """Model for task response"""
     task_id: str = Field(..., description="Unique identifier for the task")
     status: str = Field(..., description="Task status")
     message: str = Field(..., description="Response message")
-    task_details: Dict[str, Any] = Field(..., description="Details of the submitted task")
+    task_details: Dict[str, Any] = Field(
+        ..., description="Details of the submitted task"
+    )
     created_at: str = Field(..., description="Task creation timestamp")
-    workflow_result: Optional[Dict[str, Any]] = Field(None, description="LangChain workflow execution result")
+    workflow_result: Optional[Dict[str, Any]] = Field(
+        None, description="LangChain workflow execution result"
+    )
 
 
-def extract_output_requirements(task_description: str) -> Dict[str, Any]:  # Extract output requirements from task description
+def extract_output_requirements(
+    task_description: str
+) -> Dict[str, Any]:  # Extract output requirements from task description
     """Extract specific output requirements from task description"""
     requirements = {
         "format": "json",
@@ -167,9 +202,13 @@ def extract_output_requirements(task_description: str) -> Dict[str, Any]:  # Ext
     
     return requirements
 
-async def detect_workflow_type_llm(task_description: str, default_workflow: str = "data_analysis") -> str:  # LLM-based workflow type detection
+async def detect_workflow_type_llm(
+    task_description: str, 
+    default_workflow: str = "data_analysis"
+) -> str:  # LLM-based workflow type detection
     """
-    Use LLM prompting to determine the workflow type based on the input task description
+    Use LLM prompting to determine the workflow type based on the 
+    input task description
     """
     if not task_description:
         return default_workflow
@@ -259,119 +298,98 @@ def detect_workflow_type_fallback(
     
     task_lower = task_description.lower()
     
-    # Web scraping patterns (including specific domains) 
-    # PRIORITIZE BEFORE IMAGE ANALYSIS
-    if any(
-        keyword in task_lower
-        for keyword in [
-            'wikipedia', 'wiki', 'scrape', 'list of', 'table from',
-            'coronavirus', 'worldometers', 'imdb', 'tradingeconomics',
-            'espn', 'cricinfo', 'website', 'url', 'html'
-        ]
-    ):
+    # Web scraping patterns - PRIORITIZE BEFORE IMAGE ANALYSIS
+    scraping_keywords = [
+        'scrape', 'extract', 'data from', 'table from', 'list of',
+        'website', 'url', 'html', 'web page', 'site'
+    ]
+    if any(keyword in task_lower for keyword in scraping_keywords):
         # Check if it involves multiple steps 
         # (cleaning, analysis, visualization, questions)
-        if any(
-            keyword in task_lower
-            for keyword in [
-                'clean', 'plot', 'top 10', 'rank', 'total', 'answer',
-                'question', 'extract', 'analyze', 'visualization'
-            ]
-        ):
+        multi_step_keywords = [
+            'clean', 'plot', 'top', 'rank', 'total', 'answer',
+            'question', 'extract', 'analyze', 'visualization'
+        ]
+        if any(keyword in task_lower for keyword in multi_step_keywords):
             return "multi_step_web_scraping"
         else:
-            return "multi_step_web_scraping"
-    
-    # Image analysis patterns
-    if any(
-        keyword in task_lower
-        for keyword in [
-            'image', 'photo', 'picture', 'visual', 'png', 'jpg', 'jpeg'
-        ]
-    ):
+            return "multi_step_web_scraping"    # Image analysis patterns
+    image_keywords = [
+        'image', 'photo', 'picture', 'visual', 'png', 'jpg', 'jpeg',
+        'computer vision', 'image processing'
+    ]
+    if any(keyword in task_lower for keyword in image_keywords):
         return "image_analysis"
     
     # Text analysis patterns  
-    if any(
-        keyword in task_lower
-        for keyword in [
-            'text analysis', 'nlp', 'sentiment', 'language', 'document'
-        ]
-    ):
+    text_keywords = [
+        'text analysis', 'nlp', 'sentiment', 'language', 'document',
+        'natural language processing', 'text mining'
+    ]
+    if any(keyword in task_lower for keyword in text_keywords):
         return "text_analysis"
     
     # Legal/Court data patterns - map to general data analysis
-    if any(
-        keyword in task_lower
-        for keyword in [
-            'court', 'judgment', 'legal', 'case', 'disposal', 'judge',
-            'cnr', 'ecourts'
-        ]
-    ):
+    legal_keywords = [
+        'court', 'judgment', 'legal', 'case', 'disposal', 'judge',
+        'cnr', 'ecourts', 'law', 'litigation'
+    ]
+    if any(keyword in task_lower for keyword in legal_keywords):
         return "data_analysis"
     
     # Statistical analysis patterns
-    if any(
-        keyword in task_lower
-        for keyword in [
-            'correlation', 'regression', 'statistical', 'trend', 'slope'
-        ]
-    ):
+    stats_keywords = [
+        'correlation', 'regression', 'statistical', 'trend', 'slope',
+        'analysis', 'statistics', 'hypothesis'
+    ]
+    if any(keyword in task_lower for keyword in stats_keywords):
         return "statistical_analysis"
     
     # Database analysis patterns
-    if any(
-        keyword in task_lower
-        for keyword in [
-            'sql', 'duckdb', 'database', 'query', 'parquet', 's3://'
-        ]
-    ):
+    db_keywords = [
+        'sql', 'duckdb', 'database', 'query', 'parquet', 's3://',
+        'mysql', 'postgresql', 'sqlite'
+    ]
+    if any(keyword in task_lower for keyword in db_keywords):
         return "database_analysis"
     
     # Data visualization patterns
-    if any(
-        keyword in task_lower
-        for keyword in [
-            'plot', 'chart', 'graph', 'visualization', 'scatterplot',
-            'base64', 'data uri'
-        ]
-    ):
+    viz_keywords = [
+        'plot', 'chart', 'graph', 'visualization', 'scatterplot',
+        'base64', 'data uri', 'histogram', 'bar chart'
+    ]
+    if any(keyword in task_lower for keyword in viz_keywords):
         return "data_visualization"
     
     # Exploratory data analysis patterns
-    if any(
-        keyword in task_lower
-        for keyword in [
-            'explore', 'eda', 'exploratory', 'distribution', 'summary'
-        ]
-    ):
+    eda_keywords = [
+        'explore', 'eda', 'exploratory', 'distribution', 'summary',
+        'describe', 'overview'
+    ]
+    if any(keyword in task_lower for keyword in eda_keywords):
         return "exploratory_data_analysis"
     
     # Predictive modeling patterns
-    if any(
-        keyword in task_lower
-        for keyword in [
-            'predict', 'model', 'machine learning', 'ml', 'forecast'
-        ]
-    ):
+    ml_keywords = [
+        'predict', 'model', 'machine learning', 'ml', 'forecast',
+        'classification', 'clustering', 'neural network'
+    ]
+    if any(keyword in task_lower for keyword in ml_keywords):
         return "predictive_modeling"
     
     # Code generation patterns
-    if any(
-        keyword in task_lower
-        for keyword in [
-            'generate code', 'python code', 'script', 'function'
-        ]
-    ):
+    code_keywords = [
+        'generate code', 'python code', 'script', 'function',
+        'programming', 'code'
+    ]
+    if any(keyword in task_lower for keyword in code_keywords):
         return "code_generation"
     
-    # Web scraping patterns
-    if any(
-        keyword in task_lower
-        for keyword in [
-            'scrape', 'extract', 'web', 'html', 'website'
-        ]
-    ):
+    # Generic web scraping patterns
+    web_keywords = [
+        'scrape', 'extract', 'web', 'html', 'website'
+    ]
+    if any(keyword in task_lower for keyword in web_keywords):
         return "multi_step_web_scraping"
     
     return default_workflow
@@ -431,7 +449,8 @@ def prepare_workflow_parameters(
     
     return params
 
-def extract_output_requirements(task_description: str) -> Dict[str, Any]:  # Extract output format requirements
+def extract_output_requirements(task_description: str) -> Dict[str, Any]:
+    """Extract output format requirements from task description"""
     """
     Extract specific output format requirements from task description
     """
@@ -462,14 +481,19 @@ def extract_output_requirements(task_description: str) -> Dict[str, Any]:  # Ext
 
 @app.post("/api/")
 async def analyze_data(
-    questions_txt: UploadFile = File(..., description="Required questions.txt file"),
-    files: List[UploadFile] = File(default=[], description="Optional additional files")
+    questions_txt: UploadFile = File(
+        ..., description="Required questions.txt file"
+    ),
+    files: List[UploadFile] = File(
+        default=[], description="Optional additional files"
+    )
 ):
     """
     Main endpoint that accepts multiple file uploads with required questions.txt.
     All processing is synchronous and returns results immediately.
     
-    - **questions_txt**: Required questions.txt file containing the questions (must contain 'question' in filename)
+    - **questions_txt**: Required questions.txt file containing the questions 
+      (must contain 'question' in filename)
     - **files**: Optional additional files (images, CSV, JSON, etc.)
     """
     try:  # Main API endpoint for data analysis

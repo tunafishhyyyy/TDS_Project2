@@ -10,17 +10,25 @@ import requests
 from bs4 import BeautifulSoup
 import json
 import logging
+from .constants import (
+    REQUEST_HEADERS, COMMON_DATA_CLASSES, CURRENCY_SYMBOLS,
+    SCALE_INDICATORS, FOOTNOTE_PATTERNS
+)
 
 def extract_keywords(task_description: str) -> List[str]:
-    """
-    Extracts keywords/entities from the task description using a simple regex and stopword filtering.
-    This can be replaced with a more advanced NLP/LLM-based extractor if needed.
-    """
-    stopwords = set([
-        'the', 'of', 'and', 'to', 'in', 'for', 'by', 'with', 'on', 'at', 'from', 'as', 'is', 'are', 'was', 'were', 'be', 'been', 'has', 'have', 'had', 'a', 'an', 'or', 'that', 'this', 'which', 'who', 'what', 'when', 'where', 'how', 'why', 'it', 'its', 'their', 'his', 'her', 'our', 'your', 'my', 'but', 'not', 'so', 'do', 'does', 'did', 'can', 'could', 'should', 'would', 'will', 'shall', 'may', 'might', 'must', 'also', 'such', 'than', 'then', 'there', 'here', 'these', 'those', 'all', 'any', 'each', 'other', 'some', 'many', 'most', 'more', 'less', 'few', 'lot', 'lots', 'just', 'even', 'still', 'yet', 'very', 'quite', 'rather', 'really', 'always', 'never', 'sometimes', 'often', 'usually', 'again', 'once', 'twice', 'first', 'second', 'third', 'next', 'last', 'new', 'old', 'good', 'bad', 'better', 'best', 'worst', 'same', 'different', 'another', 'own', 'much', 'such', 'big', 'small', 'large', 'great', 'high', 'low', 'long', 'short', 'early', 'late', 'young', 'old', 'important', 'main', 'major', 'minor', 'key', 'top', 'bottom', 'left', 'right', 'up', 'down', 'out', 'over', 'under', 'between', 'among', 'within', 'without', 'through', 'during', 'before', 'after', 'above', 'below', 'across', 'against', 'toward', 'upon', 'about', 'around', 'into', 'onto', 'off', 'near', 'far', 'away', 'back', 'forward', 'ahead', 'behind', 'beside', 'along', 'past', 'since', 'until', 'while', 'because', 'although', 'though', 'unless', 'except', 'despite', 'regardless', 'concerning', 'regarding', 'including', 'excluding', 'plus', 'minus', 'per', 'via', 'versus', 'vs', 'etc', 'i', 'you', 'he', 'she', 'we', 'they', 'me', 'him', 'her', 'us', 'them', 'myself', 'yourself', 'himself', 'herself', 'itself', 'ourselves', 'yourselves', 'themselves', 'whose', 'whom', 'which', 'what', 'where', 'when', 'why', 'how', 'if', 'then', 'else', 'because', 'since', 'until', 'while', 'although', 'though', 'unless', 'except', 'despite', 'regardless', 'concerning', 'regarding', 'including', 'excluding', 'plus', 'minus', 'per', 'via', 'versus', 'vs', 'etc'
-    ])
+    """Extract keywords from task description using regex and 
+    stopword filtering."""
+    # Common English stopwords (essential ones only)
+    stopwords = {
+        'the', 'of', 'and', 'to', 'in', 'for', 'by', 'with', 'on', 'at',
+        'from', 'as', 'is', 'are', 'was', 'were', 'be', 'been', 'has',
+        'have', 'had', 'a', 'an', 'or', 'that', 'this', 'which', 'who',
+        'what', 'when', 'where', 'how', 'why', 'it', 'its', 'but', 'not'
+    }
+    
     words = re.findall(r'\b\w+\b', task_description.lower())
     keywords = [w for w in words if w not in stopwords and len(w) > 2]
+    
     # Remove duplicates, preserve order
     seen = set()
     result = []
@@ -45,53 +53,51 @@ def sanitize_for_json(obj):
         return obj
     else:
         return obj
-import logging
-import json
-import re as regex
+
 
 logger = logging.getLogger(__name__)
 
 class DetectDataFormatStep:
     """
     Step 0: LLM-powered data format detection
-    - Analyze webpage HTML structure to detect data availability and format
-    - Identify if data is in HTML tables, JSON, JavaScript variables, or other formats
+    - Analyze webpage HTML structure to detect data availability
+    - Identify data format (HTML tables, JSON, JavaScript variables)
     - Provide extraction strategy recommendations
-    - Generic approach that works for any website (IMDb, Wikipedia, Trading Economics, etc.)
+    - Generic approach that works for any website
     """
     def run(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         url = input_data['url']
         task_description = input_data.get('task_description', '')
         
         try:
-            # Fetch webpage content
-            headers = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
-                "Accept-Language": "en-US,en;q=0.9",
-                "Referer": "https://www.google.com/"
-            }
-            response = requests.get(url, headers=headers)
+            # Fetch webpage content with standard headers
+            response = requests.get(url, headers=REQUEST_HEADERS)
             response.raise_for_status()
             
             # Parse HTML content
             soup = BeautifulSoup(response.text, "html.parser")
             
             # Analyze page structure with LLM
-            format_analysis = self._analyze_data_format_with_llm(soup, task_description, url)
+            format_analysis = self._analyze_data_format_with_llm(
+                soup, task_description, url
+            )
             
             print(f"Data format analysis for {url}:")
             print(f"Format: {format_analysis['format']}")
             print(f"Strategy: {format_analysis['strategy']}")
             print(f"Confidence: {format_analysis['confidence']}")
             if format_analysis.get('json_data'):
-                print(f"JSON data found: {len(format_analysis['json_data'])} characters")
+                print(
+                    f"JSON data found: "
+                    f"{len(format_analysis['json_data'])} characters"
+                )
             
             return {
                 'url': url,
                 'task_description': task_description,
                 'format_analysis': format_analysis,
                 'html_content': response.text,
-                'soup': soup  # Pass soup object for next steps (not serialized)
+                'soup': soup  # Pass soup object for next steps (not JSON serialized)
             }
             
         except Exception as e:
@@ -108,7 +114,9 @@ class DetectDataFormatStep:
                 }
             }
     
-    def _analyze_data_format_with_llm(self, soup: BeautifulSoup, task_description: str, url: str) -> Dict[str, Any]:
+    def _analyze_data_format_with_llm(
+        self, soup: BeautifulSoup, task_description: str, url: str
+    ) -> Dict[str, Any]:
         """
         Use LLM to analyze webpage structure and detect data format
         """
@@ -121,11 +129,14 @@ class DetectDataFormatStep:
             structure_info = self._extract_page_structure(soup)
             
             # Create LLM prompt for format detection
-            system_prompt = """You are an expert web scraping analyst. Analyze webpage structure to determine the best data extraction approach.
+            system_prompt = """You are an expert web scraping analyst. 
+Analyze webpage structure to determine the best data extraction approach.
 
 Your task is to identify:
-1. Data format: html_tables, json_embedded, javascript_data, structured_divs, or mixed
-2. Extraction strategy: pandas_read_html, json_parsing, regex_extraction, custom_parsing
+1. Data format: html_tables, json_embedded, javascript_data, 
+   structured_divs, or mixed
+2. Extraction strategy: pandas_read_html, json_parsing, 
+   regex_extraction, custom_parsing
 3. Confidence level: high, medium, low
 
 Consider these indicators:
@@ -140,7 +151,8 @@ Respond in this JSON format:
   "strategy": "pandas_read_html|json_parsing|regex_extraction|custom_parsing",
   "confidence": "high|medium|low",
   "reasoning": "brief explanation",
-  "json_selectors": ["script[type='application/ld+json']", "script containing data"],
+  "json_selectors": ["script[type='application/ld+json']", 
+                     "script containing data"],
   "table_selectors": ["table.chart", "table.data-table"],
   "fallback_strategy": "alternative approach if primary fails"
 }}"""
@@ -165,7 +177,9 @@ Determine the best data extraction approach for this webpage."""
             # Invoke LLM with structure data
             result = chain.invoke({
                 "url": url,
-                "task_description": task_description or "general data extraction",
+                "task_description": (
+                    task_description or "general data extraction"
+                ),
                 "structure_info": structure_info
             })
             
@@ -187,8 +201,10 @@ Determine the best data extraction approach for this webpage."""
                         raise ValueError(f"Missing required field: {field}")
                 
                 # Extract JSON data if strategy suggests it
-                if format_analysis['strategy'] in ['json_parsing', 'regex_extraction']:
-                    json_data = self._extract_json_data(soup, format_analysis.get('json_selectors', []))
+                strategies = ['json_parsing', 'regex_extraction']
+                if format_analysis['strategy'] in strategies:
+                    selectors = format_analysis.get('json_selectors', [])
+                    json_data = self._extract_json_data(soup, selectors)
                     if json_data:
                         format_analysis['json_data'] = json_data
                 
@@ -217,7 +233,10 @@ Determine the best data extraction approach for this webpage."""
                 rows = len(table.find_all("tr"))
                 cols = len(table.find_all("td")) + len(table.find_all("th"))
                 classes = table.get("class", [])
-                structure_info.append(f"  Table {i}: {rows} rows, ~{cols} cells, classes: {classes}")
+                structure_info.append(
+                    f"  Table {i}: {rows} rows, ~{cols} cells, "
+                    f"classes: {classes}"
+                )
         
         # Check for JSON in script tags
         scripts = soup.find_all("script")
@@ -226,14 +245,18 @@ Determine the best data extraction approach for this webpage."""
         for script in scripts:
             if script.get("type") == "application/ld+json":
                 json_scripts += 1
-            elif script.string and ("data" in script.string.lower() or "{" in script.string):
+            elif script.string and (
+                "data" in script.string.lower() or "{" in script.string
+            ):
                 data_scripts += 1
-        structure_info.append(f"Script tags: {len(scripts)} total, {json_scripts} JSON-LD, {data_scripts} with data")
+        structure_info.append(
+            f"Script tags: {len(scripts)} total, {json_scripts} JSON-LD, "
+            f"{data_scripts} with data"
+        )
         
         # Check for structured content divs
-        common_data_classes = ["chart", "data", "list", "table", "grid", "content", "results"]
         structured_divs = 0
-        for class_name in common_data_classes:
+        for class_name in COMMON_DATA_CLASSES:
             divs = soup.find_all("div", class_=re.compile(class_name, re.IGNORECASE))
             if divs:
                 structured_divs += len(divs)
@@ -244,7 +267,10 @@ Determine the best data extraction approach for this webpage."""
         structure_info.append(f"Lists found: {len(lists)}")
         
         # Sample page content
-        text_content = soup.get_text()[:500] + "..." if len(soup.get_text()) > 500 else soup.get_text()
+        full_text = soup.get_text()
+        text_content = (
+            full_text[:500] + "..." if len(full_text) > 500 else full_text
+        )
         structure_info.append(f"Page content sample: {text_content}")
         
         return "\n".join(structure_info)
@@ -282,7 +308,9 @@ Determine the best data extraction approach for this webpage."""
                         except json.JSONDecodeError:
                             continue
                     # Look for variable assignments with JSON data
-                    json_pattern = r'(?:var|let|const)\s+\w+\s*=\s*(\{.*?\}|\[.*?\]);?'
+                    json_pattern = (
+                        r'(?:var|let|const)\s+\w+\s*=\s*(\{.*?\}|\[.*?\]);?'
+                    )
                     matches = re.findall(json_pattern, text, re.DOTALL)
                     for match in matches:
                         try:
@@ -308,7 +336,7 @@ Determine the best data extraction approach for this webpage."""
 class ScrapeTableStep:
     """
     Step 1: Enhanced data extraction based on format analysis
-    - Use format analysis from DetectDataFormatStep to choose extraction method
+    - Use format analysis to choose optimal extraction method
     - Support multiple data formats: HTML tables, JSON, JavaScript data
     - Intelligent fallback mechanisms
     - Generic approach for any website structure
@@ -318,7 +346,8 @@ class ScrapeTableStep:
         format_analysis = input_data.get('format_analysis', {})
         task_description = input_data.get('task_description', '')
         
-        print(f"Extracting data using strategy: {format_analysis.get('strategy', 'pandas_read_html')}")
+        strategy = format_analysis.get('strategy', 'pandas_read_html')
+        print(f"Extracting data using strategy: {strategy}")
         
         soup = None
         html_content = ""
@@ -329,18 +358,15 @@ class ScrapeTableStep:
                 soup = input_data['soup']
                 html_content = input_data.get('html_content', '')
             else:
-                headers = {
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
-                    "Accept-Language": "en-US,en;q=0.9",
-                    "Referer": "https://www.google.com/"
-                }
-                response = requests.get(url, headers=headers)
+                response = requests.get(url, headers=REQUEST_HEADERS)
                 response.raise_for_status()
                 soup = BeautifulSoup(response.text, "html.parser")
                 html_content = response.text
             
             # Extract data based on detected format
-            data = self._extract_data_by_strategy(soup, html_content, format_analysis, task_description)
+            data = self._extract_data_by_strategy(
+                soup, html_content, format_analysis, task_description
+            )
             
             if data is None or (hasattr(data, 'empty') and data.empty):
                 raise ValueError("No data extracted from the webpage")
@@ -355,12 +381,7 @@ class ScrapeTableStep:
             # Ensure we have soup for fallback
             if soup is None:
                 try:
-                    headers = {
-                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
-                        "Accept-Language": "en-US,en;q=0.9",
-                        "Referer": "https://www.google.com/"
-                    }
-                    response = requests.get(url, headers=headers)
+                    response = requests.get(url, headers=REQUEST_HEADERS)
                     response.raise_for_status()
                     soup = BeautifulSoup(response.text, "html.parser")
                 except Exception as fallback_error:
@@ -369,9 +390,15 @@ class ScrapeTableStep:
             
             data = self._fallback_table_extraction(soup, task_description)
             
-        return sanitize_for_json({'data': data, 'url': url, 'format_analysis': format_analysis})
+        return sanitize_for_json({
+            'data': data, 
+            'url': url, 
+            'format_analysis': format_analysis
+        })
     
-    def _extract_data_by_strategy(self, soup, html_content: str, format_analysis: Dict, task_description: str) -> pd.DataFrame:
+    def _extract_data_by_strategy(
+        self, soup, html_content: str, format_analysis: Dict, task_description: str
+    ) -> pd.DataFrame:
         """
         Extract data using the strategy recommended by format analysis
         """
@@ -386,7 +413,9 @@ class ScrapeTableStep:
         else:  # Default to pandas_read_html
             return self._extract_from_html_tables(soup, task_description)
     
-    def _extract_from_json(self, soup, format_analysis: Dict, task_description: str) -> pd.DataFrame:
+    def _extract_from_json(
+        self, soup, format_analysis: Dict, task_description: str
+    ) -> pd.DataFrame:
         """
         Extract data from JSON embedded in script tags
         """
@@ -405,7 +434,9 @@ class ScrapeTableStep:
         except Exception as e:
             raise ValueError(f"Failed to parse JSON data: {str(e)}")
     
-    def _extract_from_javascript(self, html_content: str, task_description: str) -> pd.DataFrame:
+    def _extract_from_javascript(
+        self, html_content: str, task_description: str
+    ) -> pd.DataFrame:
         """
         Extract data from JavaScript variables using regex patterns
         """
@@ -418,14 +449,18 @@ class ScrapeTableStep:
         # Convert extracted JS data to DataFrame
         return self._parse_js_data_to_dataframe(js_data, task_description)
     
-    def _extract_from_structured_divs(self, soup, task_description: str) -> pd.DataFrame:
+    def _extract_from_structured_divs(
+        self, soup, task_description: str
+    ) -> pd.DataFrame:
         """
         Extract data from structured div elements (common in modern websites)
         """
         # Use LLM to identify relevant div patterns and extract data
         return self._extract_div_data_with_llm(soup, task_description)
     
-    def _extract_from_html_tables(self, soup, task_description: str) -> pd.DataFrame:
+    def _extract_from_html_tables(
+        self, soup, task_description: str
+    ) -> pd.DataFrame:
         """
         Traditional HTML table extraction with enhanced selection
         """
@@ -462,7 +497,8 @@ class ScrapeTableStep:
         keywords = extract_keywords(task_description)
         best_table_idx = self._select_best_table_with_llm(tables, task_description, keywords)
         data = tables[best_table_idx]
-        print(f"Selected table {best_table_idx} with {data.shape[0]} rows and {data.shape[1]} columns")
+        print(f"Selected table {best_table_idx} with {data.shape[0]} rows "
+              f"and {data.shape[1]} columns")
         
         return data
     
@@ -1846,34 +1882,19 @@ class AnswerQuestionsStep:
                             pass
                 answers['correlations'] = correlations
             
-            # Domain-specific question handling
-            
-            # 1. Financial/Revenue data (movies, GDP, etc.)
-            if self._is_financial_data(analysis_col, task_description):
-                self._answer_financial_questions(answers, data_clean, analysis_col, name_col, task_description)
-            
-            # 2. Health/Medical data (COVID, disease statistics)
-            elif self._is_health_data(analysis_col, task_description):
-                self._answer_health_questions(answers, data_clean, analysis_col, name_col, top_n_df)
-            
-            # 3. Sports data (cricket, football, etc.)
-            elif self._is_sports_data(analysis_col, task_description):
-                self._answer_sports_questions(answers, data_clean, analysis_col, name_col, top_n_df)
-            
-            # 4. Economic data (inflation, trading)
-            elif self._is_economic_data(analysis_col, task_description):
-                self._answer_economic_questions(answers, data_clean, analysis_col, name_col)
-            
-            # 5. Entertainment data (ratings, reviews)
-            elif self._is_entertainment_data(analysis_col, task_description):
-                self._answer_entertainment_questions(answers, data_clean, analysis_col, name_col, top_n_df)
-            
-            # Time-based analysis if year column exists
-            year_cols = [col for col in data_clean.columns if 'year' in str(col).lower()]
-            if year_cols:
-                self._answer_temporal_questions(answers, data_clean, analysis_col, name_col, year_cols[0])
-            
-            # Full top N list for reference
+        # Use generic LLM-based question answering for all data types
+        llm_answers = self._answer_questions_with_llm(
+            data_clean, top_n_df, analysis_col, name_col, task_description
+        )
+        answers.update(llm_answers)
+        
+        # Time-based analysis if year column exists (generic approach)
+        year_cols = [col for col in data_clean.columns 
+                     if 'year' in str(col).lower()]
+        if year_cols:
+            self._answer_temporal_questions(
+                answers, data_clean, analysis_col, name_col, year_cols[0]
+            )            # Full top N list for reference
             top_list = []
             for i, (idx, row) in enumerate(top_n_df.iterrows()):
                 top_list.append({
@@ -1896,18 +1917,21 @@ class AnswerQuestionsStep:
             answers['status'] = 'success'
         
         # Include visualization if available and requested in task
-        if plot_base64 and any(keyword in task_description.lower() for keyword in ['scatterplot', 'scatter plot', 'plot', 'chart', 'visualization', 'base64', 'data uri']):
+        if (plot_base64 and 
+            any(keyword in task_description.lower() 
+                for keyword in ['plot', 'chart', 'visualization', 'base64'])):
             print("Including plot_base64 in answers as requested by task")
             answers['visualization'] = plot_base64
         
-        # Check if this is the specific Wikipedia films task format (JSON array of strings)
-        if self._is_wikipedia_films_task(task_description):
-            json_array_answers = self._generate_wikipedia_films_answers(answers, data_clean, analysis_col, name_col, plot_base64, task_description)
-            answers['json_array_response'] = json_array_answers
+        # Use LLM-based question answering for all tasks
+        llm_answers = self._answer_questions_with_llm(
+            data_clean, top_n_df, analysis_col, name_col, task_description
+        )
+        answers.update(llm_answers)
         
         print("\nFINAL ANSWERS:")
         for key, value in answers.items():
-            if key not in ['top_n_list', 'correlations', 'visualization', 'json_array_response']:  # Don't print large objects
+            if key not in ['top_n_list', 'correlations', 'visualization']:
                 print(f"  {key}: {value}")
         
         return sanitize_for_json({'answers': answers})
@@ -2200,100 +2224,70 @@ Respond with a JSON object containing relevant answers and insights."""
             return 'general'
     
     def _identify_domain(self, task_description: str) -> str:
-        """Identify the domain/industry of the data"""
+        """Identify the domain/industry of the data using LLM-based classification"""
+        try:
+            from langchain.prompts import ChatPromptTemplate
+            from langchain.schema import StrOutputParser
+            from config import get_chat_model
+            
+            system_prompt = """You are a data domain classifier. 
+Classify the data domain based on task description.
+
+Respond with ONE of these domains:
+- financial: revenue, profit, market data, trading, economics
+- entertainment: movies, TV, music, games, media
+- health: medical, disease, COVID, healthcare statistics
+- sports: athletics, games, competitions, player stats
+- technology: software, hardware, IT, programming
+- geographic: countries, cities, population, demographics
+- general: any other type of data
+
+Respond with only the domain name."""
+            
+            human_prompt = "Task description: {task_description}"
+            
+            prompt = ChatPromptTemplate.from_messages([
+                ("system", system_prompt),
+                ("human", human_prompt)
+            ])
+            
+            llm = get_chat_model()
+            chain = prompt | llm | StrOutputParser()
+            
+            result = chain.invoke({
+                "task_description": task_description
+            })
+            
+            # Clean and validate result
+            domain = result.strip().lower()
+            valid_domains = [
+                'financial', 'entertainment', 'health', 'sports', 
+                'technology', 'geographic', 'general'
+            ]
+            
+            return domain if domain in valid_domains else 'general'
+            
+        except Exception as e:
+            logger.warning(f"LLM domain classification failed: {e}")
+            # Fallback to keyword-based classification
+            return self._identify_domain_fallback(task_description)
+    
+    def _identify_domain_fallback(self, task_description: str) -> str:
+        """Fallback domain identification using keywords"""
         task_lower = task_description.lower()
         
-        if 'wikipedia' in task_lower and 'films' in task_lower:
-            return 'movies'
-        elif 'imdb' in task_lower:
-            return 'movies'
-        elif 'covid' in task_lower or 'coronavirus' in task_lower:
+        financial_keywords = ['revenue', 'profit', 'gdp', 'economics', 'trading']
+        entertainment_keywords = ['movie', 'film', 'rating', 'imdb', 'tv']
+        health_keywords = ['covid', 'coronavirus', 'medical', 'disease']
+        sports_keywords = ['cricket', 'football', 'basketball', 'espn']
+        
+        if any(keyword in task_lower for keyword in financial_keywords):
+            return 'financial'
+        elif any(keyword in task_lower for keyword in entertainment_keywords):
+            return 'entertainment'
+        elif any(keyword in task_lower for keyword in health_keywords):
             return 'health'
-        elif 'cricket' in task_lower or 'espn' in task_lower:
+        elif any(keyword in task_lower for keyword in sports_keywords):
             return 'sports'
-        elif 'inflation' in task_lower or 'trading' in task_lower:
-            return 'economics'
         else:
             return 'general'
-    
-    def _is_wikipedia_films_task(self, task_description: str) -> bool:
-        """Check if this is the specific Wikipedia films task that requires JSON array format"""
-        task_lower = task_description.lower()
-        return ('wikipedia' in task_lower and 'highest-grossing' in task_lower and 
-                'json array of strings' in task_lower and 'correlation between' in task_lower)
-    
-    def _generate_wikipedia_films_answers(self, answers: dict, data_clean, analysis_col: str, name_col: str, plot_base64: str, task_description: str) -> list:
-        """Generate the specific JSON array format for Wikipedia films task"""
-        json_answers = []
-        
-        # Question 1: How many $2 bn movies were released before 2000?
-        try:
-            if data_clean is not None and len(data_clean) > 0:
-                # Look for year column
-                year_cols = [col for col in data_clean.columns if 'year' in str(col).lower()]
-                if year_cols and analysis_col:
-                    # Count movies with revenue >= 2 billion and year < 2000
-                    before_2000 = data_clean[
-                        (data_clean[year_cols[0]] < 2000) & 
-                        (data_clean[analysis_col] >= 2000000000)
-                    ]
-                    count = len(before_2000)
-                    json_answers.append(str(count))
-                else:
-                    json_answers.append("0")
-            else:
-                json_answers.append("0")
-        except:
-            json_answers.append("0")
-        
-        # Question 2: Which is the earliest film that grossed over $1.5 bn?
-        try:
-            if data_clean is not None and len(data_clean) > 0:
-                # Look for year column
-                year_cols = [col for col in data_clean.columns if 'year' in str(col).lower()]
-                if year_cols and analysis_col:
-                    # Find movies with revenue >= 1.5 billion, sorted by year
-                    over_1_5bn = data_clean[data_clean[analysis_col] >= 1500000000]
-                    if len(over_1_5bn) > 0:
-                        earliest = over_1_5bn.loc[over_1_5bn[year_cols[0]].idxmin()]
-                        json_answers.append(str(earliest[name_col]))
-                    else:
-                        json_answers.append("None found")
-                else:
-                    json_answers.append("Unable to determine")
-            else:
-                json_answers.append("No data")
-        except:
-            json_answers.append("Unable to determine")
-        
-        # Question 3: What's the correlation between Rank and Peak?
-        try:
-            if 'correlations' in answers and answers['correlations']:
-                # Look for rank/peak correlation in the correlations dict
-                corr_found = None
-                for key, value in answers['correlations'].items():
-                    if 'rank' in key.lower() or 'peak' in key.lower():
-                        corr_found = value
-                        break
-                
-                if corr_found is not None:
-                    json_answers.append(f"{corr_found:.3f}")
-                else:
-                    # Use first correlation as fallback
-                    first_corr = list(answers['correlations'].values())[0]
-                    json_answers.append(f"{first_corr:.3f}")
-            else:
-                json_answers.append("Unable to calculate")
-        except:
-            json_answers.append("Unable to calculate")
-        
-        # Question 4: Draw a scatterplot of Rank and Peak with regression line (base64 data URI)
-        try:
-            if plot_base64:
-                json_answers.append(plot_base64)
-            else:
-                json_answers.append("Visualization not available")
-        except:
-            json_answers.append("Visualization failed")
-        
-        return json_answers
