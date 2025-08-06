@@ -2,67 +2,41 @@ import json
 import logging
 import math
 import re
-import requests
 from typing import Any, Dict, List
 
+import requests
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from bs4 import BeautifulSoup
 
-from .constants import REQUEST_HEADERS, COMMON_DATA_CLASSES
+from utils.constants import (
+    REQUEST_HEADERS, COMMON_DATA_CLASSES, ENGLISH_STOPWORDS, CONTENT_SELECTORS,
+    MATPLOTLIB_BACKEND, WORD_REGEX_PATTERN, MIN_KEYWORD_LENGTH, HTML_PARSER
+)
+from utils.prompts import (
+    DATA_FORMAT_DETECTION_SYSTEM_PROMPT, DATA_FORMAT_DETECTION_HUMAN_PROMPT,
+    JSON_TO_DATAFRAME_SYSTEM_PROMPT, JSON_TO_DATAFRAME_HUMAN_PROMPT,
+    JAVASCRIPT_EXTRACTION_SYSTEM_PROMPT, JAVASCRIPT_EXTRACTION_HUMAN_PROMPT,
+    DIV_EXTRACTION_SYSTEM_PROMPT, DIV_EXTRACTION_HUMAN_PROMPT,
+    TABLE_SELECTION_SYSTEM_PROMPT, TABLE_SELECTION_HUMAN_PROMPT,
+    HEADER_DETECTION_SYSTEM_PROMPT, HEADER_DETECTION_HUMAN_PROMPT,
+    COLUMN_SELECTION_SYSTEM_PROMPT, COLUMN_SELECTION_HUMAN_PROMPT,
+    SUMMARY_ROW_FILTERING_SYSTEM_PROMPT, SUMMARY_ROW_FILTERING_HUMAN_PROMPT,
+    CHART_TYPE_DETECTION_SYSTEM_PROMPT, CHART_TYPE_DETECTION_HUMAN_PROMPT,
+    QUESTION_ANSWERING_SYSTEM_PROMPT, QUESTION_ANSWERING_HUMAN_PROMPT
+)
 
 # Set matplotlib backend after import
-matplotlib.use("Agg")  # Set non-interactive backend for Docker
+matplotlib.use(MATPLOTLIB_BACKEND)  # Set non-interactive backend for Docker
 
 
 def extract_keywords(task_description: str) -> List[str]:
     """Extract keywords from task description using regex and
     stopword filtering."""
-    # Common English stopwords (essential ones only)
-    stopwords = {
-        "the",
-        "of",
-        "and",
-        "to",
-        "in",
-        "for",
-        "by",
-        "with",
-        "on",
-        "at",
-        "from",
-        "as",
-        "is",
-        "are",
-        "was",
-        "were",
-        "be",
-        "been",
-        "has",
-        "have",
-        "had",
-        "a",
-        "an",
-        "or",
-        "that",
-        "this",
-        "which",
-        "who",
-        "what",
-        "when",
-        "where",
-        "how",
-        "why",
-        "it",
-        "its",
-        "but",
-        "not",
-    }
-
-    words = re.findall(r"\b\w+\b", task_description.lower())
-    keywords = [w for w in words if w not in stopwords and len(w) > 2]
+    words = re.findall(WORD_REGEX_PATTERN, task_description.lower())
+    keywords = [w for w in words if w not in ENGLISH_STOPWORDS and len(w) > MIN_KEYWORD_LENGTH]
 
     # Remove duplicates, preserve order
     seen = set()
@@ -113,7 +87,7 @@ class DetectDataFormatStep:
             response.raise_for_status()
 
             # Parse HTML content
-            soup = BeautifulSoup(response.text, "html.parser")
+            soup = BeautifulSoup(response.text, HTML_PARSER)
 
             # Analyze page structure with LLM
             format_analysis = self._analyze_data_format_with_llm(soup, task_description, url)
@@ -162,44 +136,8 @@ class DetectDataFormatStep:
             structure_info = self._extract_page_structure(soup)
 
             # Create LLM prompt for format detection
-            system_prompt = """You are an expert web scraping analyst.
-Analyze webpage structure to determine the best data extraction approach.
-
-Your task is to identify:
-1. Data format: html_tables, json_embedded, javascript_data,
-   structured_divs, or mixed
-2. Extraction strategy: pandas_read_html, json_parsing,
-   regex_extraction, custom_parsing
-3. Confidence level: high, medium, low
-
-Consider these indicators:
-- HTML <table> tags suggest html_tables format
-- <script> tags with JSON/data suggest javascript_data format
-- Structured <div> patterns suggest structured_divs format
-- Multiple formats may coexist (mixed)
-
-Respond in this JSON format:
-{{
-  "format": "html_tables|json_embedded|javascript_data|structured_divs|mixed",
-  "strategy": "pandas_read_html|json_parsing|regex_extraction|custom_parsing",
-  "confidence": "high|medium|low",
-  "reasoning": "brief explanation",
-  "json_selectors": ["script[type='application/ld+json']",
-                     "script containing data"],
-  "table_selectors": ["table.chart", "table.data-table"],
-  "fallback_strategy": "alternative approach if primary fails"
-}}"""
-
-            human_prompt = """URL: {url}
-Task: {task_description}
-
-Page structure analysis:
-{structure_info}
-
-Determine the best data extraction approach for this webpage."""
-
             prompt = ChatPromptTemplate.from_messages(
-                [("system", system_prompt), ("human", human_prompt)]
+                [("system", DATA_FORMAT_DETECTION_SYSTEM_PROMPT), ("human", DATA_FORMAT_DETECTION_HUMAN_PROMPT)]
             )
 
             # Get LLM model and create chain
@@ -534,18 +472,7 @@ class ScrapeTableStep:
         tables = []
 
         # Try to find structured content areas
-        content_selectors = [
-            ".chart",
-            ".data-table",
-            ".list",
-            ".grid",
-            ".content",
-            "[class*='chart']",
-            "[class*='table']",
-            "[class*='list']",
-        ]
-
-        for selector in content_selectors:
+        for selector in CONTENT_SELECTORS:
             elements = soup.select(selector)
             for element in elements:
                 rows = element.find_all("tr")
@@ -587,30 +514,8 @@ class ScrapeTableStep:
                 str(data_obj)[:1000] + "..." if len(str(data_obj)) > 1000 else str(data_obj)
             )
 
-            system_prompt = """You are a data extraction expert. Analyze the JSON structure and provide
-            instructions for converting it to a tabular DataFrame.
-Identify:
-1. The path to the array/list containing the main data
-2. The key fields that should become DataFrame columns
-3. Any nested structures that need flattening
-
-Respond in this JSON format:
-{{
-  "data_path": "path.to.data.array (e.g., 'results', 'data.items', 'movies')",
-  "key_fields": ["field1", "field2", "field3"],
-  "nested_fields": {{"field_name": "path.to.nested.value"}},
-  "instructions": "brief explanation of the structure"
-}}"""
-
-            human_prompt = """Task: {task_description}
-
-JSON Structure Sample:
-{json_sample}
-
-Provide extraction instructions for converting this JSON to a DataFrame."""
-
             prompt = ChatPromptTemplate.from_messages(
-                [("system", system_prompt), ("human", human_prompt)]
+                [("system", JSON_TO_DATAFRAME_SYSTEM_PROMPT), ("human", JSON_TO_DATAFRAME_HUMAN_PROMPT)]
             )
 
             llm = get_chat_model()
@@ -703,24 +608,8 @@ Provide extraction instructions for converting this JSON to a DataFrame."""
                 if len(script) > 100:  # Only analyze substantial scripts
                     script_sample += script[:500] + "\n---\n"
 
-            system_prompt = """You are a JavaScript data extraction expert. Analyze script content to find
-            data relevant to the task. Look for:
-1. Variable assignments with arrays/objects
-2. JSON data embedded in JavaScript
-3. API responses or data initialization
-4. Structured data patterns
-
-Extract the relevant JavaScript code that contains the data. Return only the data assignment or object definition."""
-
-            human_prompt = """Task: {task_description}
-
-JavaScript Content Sample:
-{script_sample}
-
-Extract the JavaScript code containing the relevant data for this task."""
-
             prompt = ChatPromptTemplate.from_messages(
-                [("system", system_prompt), ("human", human_prompt)]
+                [("system", JAVASCRIPT_EXTRACTION_SYSTEM_PROMPT), ("human", JAVASCRIPT_EXTRACTION_HUMAN_PROMPT)]
             )
 
             llm = get_chat_model()
@@ -794,28 +683,8 @@ Extract the JavaScript code containing the relevant data for this task."""
                 }
                 container_info.append(info)
 
-            system_prompt = """You are a web scraping expert specializing in extracting tabular data from
-            div-based layouts. Analyze the HTML structure and identify which container holds the
-            relevant data. Then provide extraction instructions.
-
-Respond in JSON format:
-{{
-  "container_index": 0,
-  "extraction_method": "text_rows|attribute_values|nested_elements",
-  "row_selector": "CSS selector for rows",
-  "cell_selector": "CSS selector for cells within rows",
-  "headers": ["column1", "column2", "column3"]
-}}"""
-
-            human_prompt = """Task: {task_description}
-
-Container Analysis:
-{container_info}
-
-Which container contains the data and how should it be extracted?"""
-
             prompt = ChatPromptTemplate.from_messages(
-                [("system", system_prompt), ("human", human_prompt)]
+                [("system", DIV_EXTRACTION_SYSTEM_PROMPT), ("human", DIV_EXTRACTION_HUMAN_PROMPT)]
             )
 
             llm = get_chat_model()
@@ -941,25 +810,6 @@ Which container contains the data and how should it be extracted?"""
                 table_previews.append(preview)
 
             # Create LLM prompt for table selection
-            system_prompt = """You are an expert web scraping assistant. Given multiple HTML tables from a webpage,
-            select the most relevant table for data analysis based on the task description.
-
-            Consider these factors:
-            1. Table size and data density
-            2. Column relevance to the task
-            3. Data quality and completeness
-            4. Avoid summary/navigation tables
-
-            Respond with ONLY the table index number (0, 1, 2, etc.) that best matches the analysis requirements."""
-
-            human_prompt = """Task: {task_description}
-Keywords/entities: {keywords}
-
-Available tables:
-{table_info}
-
-Which table index (0-{max_index}) contains the most relevant data for this analysis?
-Respond with just the number."""
 
             # Format table information for LLM
             table_info_str = ""
@@ -969,8 +819,9 @@ Respond with just the number."""
                 table_info_str += f"Sample data:\n{preview['sample_data']}\n"
                 table_info_str += "-" * 50 + "\n"
 
+            # Use correct prompt variables from utils.prompts
             prompt = ChatPromptTemplate.from_messages(
-                [("system", system_prompt), ("human", human_prompt)]
+                [("system", TABLE_SELECTION_SYSTEM_PROMPT), ("human", TABLE_SELECTION_HUMAN_PROMPT)]
             )
 
             # Get LLM model and create chain
@@ -1114,30 +965,8 @@ class InspectTableStep:
             rows_to_check = min(3, len(data))
             table_sample = data.head(rows_to_check).to_string(max_cols=10)
 
-            system_prompt = """You are an expert data analyst. Examine the first few rows of a
-            table and determine if any row contains column headers.
-            Look for:
-            1. Descriptive names instead of data values
-            2. Text patterns typical of headers (Name, Rank, Total, etc.)
-            3. Consistency with the analysis task
-            4. Non-numeric values in what should be data rows
-
-            Respond with ONLY the row index (0, 1, 2) that contains headers,
-            or "NONE" if no headers are found in the data rows."""
-
-            human_prompt = """Task: {task_description}
-Keywords/entities: {keywords}
-
-Table sample (first {rows_count} rows):
-{table_sample}
-
-Current column names: {current_columns}
-
-Which row index (0, 1, 2) contains the headers, or "NONE" if headers are not in the data rows?
-Respond with just the number or "NONE"."""
-
             prompt = ChatPromptTemplate.from_messages(
-                [("system", system_prompt), ("human", human_prompt)]
+                [("system", HEADER_DETECTION_SYSTEM_PROMPT), ("human", HEADER_DETECTION_HUMAN_PROMPT)]
             )
 
             llm = get_chat_model()
@@ -1420,32 +1249,8 @@ class AnalyzeDataStep:
                         f"Column '{col}': {valid_count} valid values, range {value_range}, samples: {sample_values}"
                     )
 
-            system_prompt = """You are an expert data analyst. Given numeric columns and a task description,
-            select the most relevant column for analysis.
-
-            Avoid columns that are:
-            - Summary/total columns (containing "total", "sum", "world", etc.)
-            - Year columns (4-digit numbers starting with 19xx or 20xx)
-            - Rank/position columns (containing "rank", "position")
-            - Index columns
-
-            Prefer columns with:
-            - Values relevant to the analysis task
-            - Good data completeness
-            - Meaningful value ranges for comparison
-
-            Respond with ONLY the exact column name."""
-
-            human_prompt = """Task: {task_description}
-Keywords/entities: {keywords}
-
-Available numeric columns:
-{column_descriptions}
-
-Which column is most relevant for this analysis? Respond with just the column name."""
-
             prompt = ChatPromptTemplate.from_messages(
-                [("system", system_prompt), ("human", human_prompt)]
+                [("system", COLUMN_SELECTION_SYSTEM_PROMPT), ("human", COLUMN_SELECTION_HUMAN_PROMPT)]
             )
 
             llm = get_chat_model()
@@ -1534,28 +1339,8 @@ Which column is most relevant for this analysis? Respond with just the column na
             name_col = text_cols[0]
             sample_data = data.head(20)  # Look at first 20 rows
 
-            system_prompt = """You are a data cleaning expert. Examine the data rows and identify
-            which ones are summary/total/aggregate rows that should be filtered out for analysis.
-
-Look for rows that contain:
-- Total/sum values (like "Total", "World", "All Countries", "Overall")
-- Summary statistics (like "Average", "Mean", "Median")
-- Aggregate categories (like "Other", "Others", "Miscellaneous")
-- Non-specific entries that aren't individual data points
-
-Return a comma-separated list of the exact values from the name column that should be removed.
-If no summary rows are found, respond with "NONE"."""
-
-            human_prompt = """Task: {task_description}
-
-Data sample (first 20 rows, name column '{name_col}'):
-{data_sample}
-
-Which values from the '{name_col}' column represent summary/total rows that should be filtered out?
-Respond with exact values separated by commas, or "NONE" if no summary rows found."""
-
             prompt = ChatPromptTemplate.from_messages(
-                [("system", system_prompt), ("human", human_prompt)]
+                [("system", SUMMARY_ROW_FILTERING_SYSTEM_PROMPT), ("human", SUMMARY_ROW_FILTERING_HUMAN_PROMPT)]
             )
 
             llm = get_chat_model()
@@ -1876,34 +1661,8 @@ class VisualizeStep:
             numeric_cols = data_clean.select_dtypes(include=[np.number]).columns.tolist()
             text_cols = data_clean.select_dtypes(include=["object"]).columns.tolist()
 
-            system_prompt = """You are a data visualization expert. Based on the task description
-            and data characteristics, recommend the most appropriate chart type.
-
-Available chart types:
-- bar: For rankings, comparisons, top N items
-- scatter: For correlations, relationships between two numeric variables
-- histogram: For distributions of a single numeric variable
-- time_series: For data over time periods
-
-Consider:
-1. What the task is asking for (correlation, distribution, ranking, time trends)
-2. The type of analysis needed
-3. The data structure and column types
-
-Respond with ONLY one of: bar, scatter, histogram, time_series"""
-
-            human_prompt = """Task: {task_description}
-Keywords/entities: {keywords}
-
-Data characteristics:
-- Numeric columns: {numeric_cols}
-- Text columns: {text_cols}
-- Data shape: {data_shape}
-
-What chart type is most appropriate? Respond with just: bar, scatter, histogram, or time_series"""
-
             prompt = ChatPromptTemplate.from_messages(
-                [("system", system_prompt), ("human", human_prompt)]
+                [("system", CHART_TYPE_DETECTION_SYSTEM_PROMPT), ("human", CHART_TYPE_DETECTION_HUMAN_PROMPT)]
             )
 
             llm = get_chat_model()
@@ -2204,36 +1963,8 @@ class AnswerQuestionsStep:
             else:
                 top_5_items = []
 
-            system_prompt = """You are an expert data analyst. Based on the task description and data insights,
-            answer specific questions that might be asked about the data.
-
-Common question types to address:
-1. Ranking questions (Who/what ranks 5th? Which is earliest/latest?)
-2. Threshold questions (How many above X value? Items before year Y?)
-3. Statistical questions (What's the correlation? Average? Total?)
-4. Domain-specific questions (death rates, averages above threshold, etc.)
-
-Provide specific numeric answers and insights. Return answers as a JSON object with descriptive keys.
-Focus on actionable insights that directly address the analysis goals."""
-
-            human_prompt = """Task: {task_description}
-
-Data insights:
-- Total items: {total_rows}
-- Analysis column: {analysis_column} (range: {min_value:.2f} to {max_value:.2f})
-- Average value: {average_value:.2f}
-- Top {top_n_count} items available
-- Numeric columns: {numeric_cols}
-- Year columns: {year_cols}
-
-Top 5 items:
-{top_5_data}
-
-Based on this data and the task requirements, what are the key insights and answers to likely questions?
-Respond with a JSON object containing relevant answers and insights."""
-
             prompt = ChatPromptTemplate.from_messages(
-                [("system", system_prompt), ("human", human_prompt)]
+                [("system", QUESTION_ANSWERING_SYSTEM_PROMPT), ("human", QUESTION_ANSWERING_HUMAN_PROMPT)]
             )
 
             llm = get_chat_model()

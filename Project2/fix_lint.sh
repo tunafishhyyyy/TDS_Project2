@@ -2,7 +2,8 @@
 
 # Script to fix common Flake8 issues in web_scraping_steps.py
 
-FILE="chains/web_scraping_steps.py"
+FILE="chains/base.py"
+
 
 echo "Fixing Flake8 issues in $FILE..."
 
@@ -13,7 +14,7 @@ sed -i 's/except:/except Exception:/g' "$FILE"
 # This is safer than deleting them entirely
 
 echo "Running Black formatter again to ensure consistent formatting..."
-black "$FILE" --line-length=100
+black "$FILE" --line-length=120
 
 echo "Checking remaining issues..."
 flake8 "$FILE" | head -20
