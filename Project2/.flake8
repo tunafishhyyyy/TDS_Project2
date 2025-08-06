@@ -1,0 +1,21 @@
+[flake8]
+max-line-length = 120
+# Set line length to 120 characters (modern standard)
+
+# Ignore specific error codes that are less critical for this project:
+# E203: whitespace before ':' (conflicts with Black formatting)
+# F841: local variable assigned but never used (common in data processing)
+# F541: f-string without placeholders (sometimes used for future expansion)
+ignore = E203,F841,F541
+
+# Exclude common non-user directories
+exclude = 
+    .git,
+    __pycache__,
+    .venv,
+    venv,
+    .tox,
+    .eggs,
+    *.egg,
+    build,
+    dist

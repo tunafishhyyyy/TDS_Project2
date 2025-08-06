@@ -1,23 +1,20 @@
-import pandas as pd
-import numpy as np
-import matplotlib
-
-matplotlib.use("Agg")  # Set non-interactive backend for Docker
-import matplotlib.pyplot as plt
-from typing import Any, Dict, List
+import json
+import logging
 import math
 import re
 import requests
+from typing import Any, Dict, List
+
+import matplotlib
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 from bs4 import BeautifulSoup
-import json
-import logging
-from .constants import (
-    REQUEST_HEADERS,
-    COMMON_DATA_CLASSES,
-    CURRENCY_SYMBOLS,
-    SCALE_INDICATORS,
-    FOOTNOTE_PATTERNS,
-)
+
+from .constants import REQUEST_HEADERS, COMMON_DATA_CLASSES
+
+# Set matplotlib backend after import
+matplotlib.use("Agg")  # Set non-interactive backend for Docker
 
 
 def extract_keywords(task_description: str) -> List[str]:
@@ -119,26 +116,21 @@ class DetectDataFormatStep:
             soup = BeautifulSoup(response.text, "html.parser")
 
             # Analyze page structure with LLM
-            format_analysis = self._analyze_data_format_with_llm(
-                soup, task_description, url
-            )
+            format_analysis = self._analyze_data_format_with_llm(soup, task_description, url)
 
             print(f"Data format analysis for {url}:")
             print(f"Format: {format_analysis['format']}")
             print(f"Strategy: {format_analysis['strategy']}")
             print(f"Confidence: {format_analysis['confidence']}")
             if format_analysis.get("json_data"):
-                print(
-                    f"JSON data found: "
-                    f"{len(format_analysis['json_data'])} characters"
-                )
+                print(f"JSON data found: " f"{len(format_analysis['json_data'])} characters")
 
             return {
                 "url": url,
                 "task_description": task_description,
                 "format_analysis": format_analysis,
                 "html_content": response.text,
-                "soup": soup,  # Pass soup object for next steps (not JSON serialized)
+                "soup": soup,
             }
 
         except Exception as e:
@@ -170,19 +162,19 @@ class DetectDataFormatStep:
             structure_info = self._extract_page_structure(soup)
 
             # Create LLM prompt for format detection
-            system_prompt = """You are an expert web scraping analyst. 
+            system_prompt = """You are an expert web scraping analyst.
 Analyze webpage structure to determine the best data extraction approach.
 
 Your task is to identify:
-1. Data format: html_tables, json_embedded, javascript_data, 
+1. Data format: html_tables, json_embedded, javascript_data,
    structured_divs, or mixed
-2. Extraction strategy: pandas_read_html, json_parsing, 
+2. Extraction strategy: pandas_read_html, json_parsing,
    regex_extraction, custom_parsing
 3. Confidence level: high, medium, low
 
 Consider these indicators:
 - HTML <table> tags suggest html_tables format
-- <script> tags with JSON/data suggest javascript_data format  
+- <script> tags with JSON/data suggest javascript_data format
 - Structured <div> patterns suggest structured_divs format
 - Multiple formats may coexist (mixed)
 
@@ -192,7 +184,7 @@ Respond in this JSON format:
   "strategy": "pandas_read_html|json_parsing|regex_extraction|custom_parsing",
   "confidence": "high|medium|low",
   "reasoning": "brief explanation",
-  "json_selectors": ["script[type='application/ld+json']", 
+  "json_selectors": ["script[type='application/ld+json']",
                      "script containing data"],
   "table_selectors": ["table.chart", "table.data-table"],
   "fallback_strategy": "alternative approach if primary fails"
@@ -284,9 +276,7 @@ Determine the best data extraction approach for this webpage."""
         for script in scripts:
             if script.get("type") == "application/ld+json":
                 json_scripts += 1
-            elif script.string and (
-                "data" in script.string.lower() or "{" in script.string
-            ):
+            elif script.string and ("data" in script.string.lower() or "{" in script.string):
                 data_scripts += 1
         structure_info.append(
             f"Script tags: {len(scripts)} total, {json_scripts} JSON-LD, "
@@ -365,7 +355,7 @@ Determine the best data extraction approach for this webpage."""
             "format": "html_tables",
             "strategy": "pandas_read_html",
             "confidence": "low",
-            "reasoning": "LLM analysis failed, using traditional table scraping",
+            "reasoning": ("LLM analysis failed, using traditional table scraping"),
             "fallback": True,
         }
 
@@ -423,19 +413,19 @@ class ScrapeTableStep:
                     response.raise_for_status()
                     soup = BeautifulSoup(response.text, "html.parser")
                 except Exception as fallback_error:
-                    print(
-                        f"Failed to fetch content for fallback: {str(fallback_error)}"
-                    )
+                    print(f"Failed to fetch content for fallback: {str(fallback_error)}")
                     raise e  # Re-raise original error
 
             data = self._fallback_table_extraction(soup, task_description)
 
-        return sanitize_for_json(
-            {"data": data, "url": url, "format_analysis": format_analysis}
-        )
+        return sanitize_for_json({"data": data, "url": url, "format_analysis": format_analysis})
 
     def _extract_data_by_strategy(
-        self, soup, html_content: str, format_analysis: Dict, task_description: str
+        self,
+        soup,
+        html_content: str,
+        format_analysis: Dict,
+        task_description: str,
     ) -> pd.DataFrame:
         """
         Extract data using the strategy recommended by format analysis
@@ -472,9 +462,7 @@ class ScrapeTableStep:
         except Exception as e:
             raise ValueError(f"Failed to parse JSON data: {str(e)}")
 
-    def _extract_from_javascript(
-        self, html_content: str, task_description: str
-    ) -> pd.DataFrame:
+    def _extract_from_javascript(self, html_content: str, task_description: str) -> pd.DataFrame:
         """
         Extract data from JavaScript variables using regex patterns
         """
@@ -487,9 +475,7 @@ class ScrapeTableStep:
         # Convert extracted JS data to DataFrame
         return self._parse_js_data_to_dataframe(js_data, task_description)
 
-    def _extract_from_structured_divs(
-        self, soup, task_description: str
-    ) -> pd.DataFrame:
+    def _extract_from_structured_divs(self, soup, task_description: str) -> pd.DataFrame:
         """
         Extract data from structured div elements (common in modern websites)
         """
@@ -526,14 +512,12 @@ class ScrapeTableStep:
             print(f"\nTable {i}:")
             print(f"  Shape: {table.shape}")
             print(f"  Columns: {table.columns.tolist()}")
-            print(f"  Sample data:")
+            print("  Sample data:")
             print(table.head(3))
 
         # Use LLM-powered table selection
         keywords = extract_keywords(task_description)
-        best_table_idx = self._select_best_table_with_llm(
-            tables, task_description, keywords
-        )
+        best_table_idx = self._select_best_table_with_llm(tables, task_description, keywords)
         data = tables[best_table_idx]
         print(
             f"Selected table {best_table_idx} with {data.shape[0]} rows "
@@ -570,15 +554,11 @@ class ScrapeTableStep:
                     for row in rows:
                         cells = row.find_all(["th", "td"])
                         if cells:
-                            extracted.append(
-                                [cell.get_text(strip=True) for cell in cells]
-                            )
+                            extracted.append([cell.get_text(strip=True) for cell in cells])
 
                     if extracted and len(extracted) > 1:
                         # Assume first row is header if it contains any <th>
-                        first_row_has_th = any(
-                            row.find_all("th") for row in [rows[0]] if rows
-                        )
+                        first_row_has_th = any(row.find_all("th") for row in [rows[0]] if rows)
                         if first_row_has_th or len(extracted[0]) == len(extracted[1]):
                             header = extracted[0]
                             data_rows = extracted[1:]
@@ -593,9 +573,7 @@ class ScrapeTableStep:
 
         return tables
 
-    def _json_to_dataframe_with_llm(
-        self, data_obj, task_description: str
-    ) -> pd.DataFrame:
+    def _json_to_dataframe_with_llm(self, data_obj, task_description: str) -> pd.DataFrame:
         """
         Convert JSON object to DataFrame using LLM guidance
         """
@@ -606,9 +584,7 @@ class ScrapeTableStep:
 
             # Analyze JSON structure
             json_sample = (
-                str(data_obj)[:1000] + "..."
-                if len(str(data_obj)) > 1000
-                else str(data_obj)
+                str(data_obj)[:1000] + "..." if len(str(data_obj)) > 1000 else str(data_obj)
             )
 
             system_prompt = """You are a data extraction expert. Analyze the JSON structure and provide instructions for converting it to a tabular DataFrame.
@@ -641,16 +617,17 @@ Provide extraction instructions for converting this JSON to a DataFrame."""
             chain = prompt | llm | StrOutputParser()
 
             result = chain.invoke(
-                {"task_description": task_description, "json_sample": json_sample}
+                {
+                    "task_description": task_description,
+                    "json_sample": json_sample,
+                }
             )
 
             # Parse LLM instructions and extract data
             try:
-                instructions = json.loads(
-                    result.strip().replace("```json", "").replace("```", "")
-                )
+                instructions = json.loads(result.strip().replace("```json", "").replace("```", ""))
                 return self._extract_dataframe_from_json(data_obj, instructions)
-            except:
+            except (json.JSONDecodeError, ValueError):
                 # Fallback: try to directly convert if it's a list of dicts
                 if isinstance(data_obj, list):
                     return pd.DataFrame(data_obj)
@@ -664,9 +641,7 @@ Provide extraction instructions for converting this JSON to a DataFrame."""
         except Exception as e:
             raise ValueError(f"Failed to convert JSON to DataFrame: {str(e)}")
 
-    def _extract_dataframe_from_json(
-        self, data_obj, instructions: Dict
-    ) -> pd.DataFrame:
+    def _extract_dataframe_from_json(self, data_obj, instructions: Dict) -> pd.DataFrame:
         """
         Extract DataFrame from JSON using LLM-provided instructions
         """
@@ -707,9 +682,7 @@ Provide extraction instructions for converting this JSON to a DataFrame."""
 
         return pd.DataFrame(rows)
 
-    def _extract_js_data_with_llm(
-        self, html_content: str, task_description: str
-    ) -> str:
+    def _extract_js_data_with_llm(self, html_content: str, task_description: str) -> str:
         """
         Use LLM to identify and extract relevant JavaScript data patterns
         """
@@ -755,7 +728,10 @@ Extract the JavaScript code containing the relevant data for this task."""
             chain = prompt | llm | StrOutputParser()
 
             result = chain.invoke(
-                {"task_description": task_description, "script_sample": script_sample}
+                {
+                    "task_description": task_description,
+                    "script_sample": script_sample,
+                }
             )
 
             return result.strip()
@@ -764,9 +740,7 @@ Extract the JavaScript code containing the relevant data for this task."""
             print(f"Error in JavaScript extraction: {str(e)}")
             return ""
 
-    def _parse_js_data_to_dataframe(
-        self, js_data: str, task_description: str
-    ) -> pd.DataFrame:
+    def _parse_js_data_to_dataframe(self, js_data: str, task_description: str) -> pd.DataFrame:
         """
         Parse extracted JavaScript data into DataFrame
         """
@@ -780,7 +754,7 @@ Extract the JavaScript code containing the relevant data for this task."""
                 cleaned = match.replace("'", '"').replace("undefined", "null")
                 data_obj = json.loads(cleaned)
                 return self._json_to_dataframe_with_llm(data_obj, task_description)
-            except:
+            except Exception:
                 continue
 
         raise ValueError("Could not parse JavaScript data to DataFrame")
@@ -798,7 +772,8 @@ Extract the JavaScript code containing the relevant data for this task."""
             data_containers = soup.find_all(
                 ["div", "section", "article"],
                 class_=re.compile(
-                    r"(chart|data|list|table|grid|content|results)", re.IGNORECASE
+                    r"(chart|data|list|table|grid|content|results)",
+                    re.IGNORECASE,
                 ),
             )
 
@@ -856,19 +831,15 @@ Which container contains the data and how should it be extracted?"""
 
             # Parse instructions and extract data
             try:
-                instructions = json.loads(
-                    result.strip().replace("```json", "").replace("```", "")
-                )
+                instructions = json.loads(result.strip().replace("```json", "").replace("```", ""))
                 return self._extract_from_div_container(data_containers, instructions)
-            except:
+            except Exception:
                 raise ValueError("Could not parse div extraction instructions")
 
         except Exception as e:
             raise ValueError(f"Failed to extract from div structure: {str(e)}")
 
-    def _extract_from_div_container(
-        self, containers: List, instructions: Dict
-    ) -> pd.DataFrame:
+    def _extract_from_div_container(self, containers: List, instructions: Dict) -> pd.DataFrame:
         """
         Extract data from div container using provided instructions
         """
@@ -920,7 +891,7 @@ Which container contains the data and how should it be extracted?"""
                 # Use simple heuristics to select best table
                 best_table = max(tables, key=lambda t: t.shape[0] * t.shape[1])
                 return best_table
-        except:
+        except Exception:
             pass
 
         # Manual extraction from any table-like structure
@@ -971,15 +942,15 @@ Which container contains the data and how should it be extracted?"""
                 table_previews.append(preview)
 
             # Create LLM prompt for table selection
-            system_prompt = """You are an expert web scraping assistant. Given multiple HTML tables from a webpage, 
+            system_prompt = """You are an expert web scraping assistant. Given multiple HTML tables from a webpage,
             select the most relevant table for data analysis based on the task description.
-            
+
             Consider these factors:
             1. Table size and data density
             2. Column relevance to the task
             3. Data quality and completeness
             4. Avoid summary/navigation tables
-            
+
             Respond with ONLY the table index number (0, 1, 2, etc.) that best matches the analysis requirements."""
 
             human_prompt = """Task: {task_description}
@@ -1021,14 +992,10 @@ Respond with just the number."""
             try:
                 selected_index = int(result.strip())
                 if 0 <= selected_index < len(tables):
-                    print(
-                        f"LLM selected table {selected_index} for task: {task_description}"
-                    )
+                    print(f"LLM selected table {selected_index} for task: {task_description}")
                     return selected_index
                 else:
-                    print(
-                        f"LLM returned invalid index {selected_index}, using fallback"
-                    )
+                    print(f"LLM returned invalid index {selected_index}, using fallback")
                     return self._fallback_table_selection(tables)
             except (ValueError, AttributeError):
                 print(f"Could not parse LLM response: {result}, using fallback")
@@ -1130,7 +1097,10 @@ class InspectTableStep:
         return sanitize_for_json({"data": data})
 
     def _detect_headers_with_llm(
-        self, data: pd.DataFrame, task_description: str = "", keywords: List[str] = None
+        self,
+        data: pd.DataFrame,
+        task_description: str = "",
+        keywords: List[str] = None,
     ) -> tuple:
         """
         Use LLM to intelligently detect if any row contains headers
@@ -1146,13 +1116,13 @@ class InspectTableStep:
             table_sample = data.head(rows_to_check).to_string(max_cols=10)
 
             system_prompt = """You are an expert data analyst. Examine the first few rows of a table and determine if any row contains column headers.
-            
+
             Look for:
             1. Descriptive names instead of data values
             2. Text patterns typical of headers (Name, Rank, Total, etc.)
             3. Consistency with the analysis task
             4. Non-numeric values in what should be data rows
-            
+
             Respond with ONLY the row index (0, 1, 2) that contains headers, or "NONE" if no headers are found in the data rows."""
 
             human_prompt = """Task: {task_description}
@@ -1195,9 +1165,7 @@ Respond with just the number or "NONE"."""
                         print(f"LLM detected headers in row {header_row}")
                         return True, header_row
                     else:
-                        print(
-                            f"LLM returned invalid row index: {result}, using fallback"
-                        )
+                        print(f"LLM returned invalid row index: {result}, using fallback")
                         return self._fallback_header_detection(data)
                 except ValueError:
                     print(f"Could not parse LLM response: {result}, using fallback")
@@ -1223,13 +1191,10 @@ Respond with just the number or "NONE"."""
             header_like_count = sum(
                 1
                 for val in first_row_values
-                if len(str(val)) > 1
-                and not str(val).replace(".", "").replace("-", "").isdigit()
+                if len(str(val)) > 1 and not str(val).replace(".", "").replace("-", "").isdigit()
             )
 
-            if (
-                header_like_count >= len(first_row_values) * 0.5
-            ):  # At least half look like headers
+            if header_like_count >= len(first_row_values) * 0.5:  # At least half look like headers
                 print("Fallback detected likely headers in first row")
                 return True, 0
 
@@ -1264,31 +1229,21 @@ class CleanDataStep:
                 # Could be enhanced to call LLM for cleaning strategy
                 # Remove common symbols and formatting (generic for various data types)
                 cleaned = cleaned.str.replace("$", "", regex=False)  # Currency
-                cleaned = cleaned.str.replace(
-                    ",", "", regex=False
-                )  # Thousands separator
+                cleaned = cleaned.str.replace(",", "", regex=False)  # Thousands separator
                 cleaned = cleaned.str.replace("€", "", regex=False)  # Euro
                 cleaned = cleaned.str.replace("£", "", regex=False)  # Pound
                 cleaned = cleaned.str.replace("¥", "", regex=False)  # Yen
                 cleaned = cleaned.str.replace("%", "", regex=False)  # Percentage
                 cleaned = cleaned.str.replace("₹", "", regex=False)  # Rupee
-                cleaned = cleaned.str.replace(
-                    "billion", "", regex=False
-                )  # Scale indicators
+                cleaned = cleaned.str.replace("billion", "", regex=False)  # Scale indicators
                 cleaned = cleaned.str.replace("million", "", regex=False)
                 cleaned = cleaned.str.replace("trillion", "", regex=False)
                 cleaned = cleaned.str.replace("bn", "", regex=False)
                 cleaned = cleaned.str.replace("mn", "", regex=False)
                 # Add more currency and number formats
-                cleaned = cleaned.str.replace(
-                    "B", "", regex=False
-                )  # Billion abbreviation
-                cleaned = cleaned.str.replace(
-                    "M", "", regex=False
-                )  # Million abbreviation
-                cleaned = cleaned.str.replace(
-                    "K", "", regex=False
-                )  # Thousand abbreviation
+                cleaned = cleaned.str.replace("B", "", regex=False)  # Billion abbreviation
+                cleaned = cleaned.str.replace("M", "", regex=False)  # Million abbreviation
+                cleaned = cleaned.str.replace("K", "", regex=False)  # Thousand abbreviation
 
                 # Remove footnote references like [1], [n 1], etc.
                 cleaned = cleaned.str.replace(r"\[.*?\]", "", regex=True)
@@ -1334,14 +1289,10 @@ class CleanDataStep:
                         "million" in str(val) or "mn" in str(val)
                         for val in data[col].astype(str).iloc[:5]
                     ):
-                        print(
-                            f"  Detected million scale factor in {col}, converting to billions"
-                        )
+                        print(f"  Detected million scale factor in {col}, converting to billions")
                         data[col] = data[col] / 1000  # Convert millions to billions
                 else:
-                    print(
-                        f"  No valid numeric data found ({valid_count} values), keeping as text"
-                    )
+                    print(f"  No valid numeric data found ({valid_count} values), keeping as text")
 
         print("\nAfter cleaning:")
         print(f"Data types:\n{data.dtypes}")
@@ -1405,9 +1356,7 @@ class AnalyzeDataStep:
             data_clean, input_data.get("task_description", "")
         )
 
-        print(
-            f"After removing NaN values and filtering summary rows: {data_clean.shape[0]} rows"
-        )
+        print(f"After removing NaN values and filtering summary rows: {data_clean.shape[0]} rows")
 
         if len(data_clean) == 0:
             print("ERROR: No valid data after cleaning and filtering")
@@ -1471,20 +1420,20 @@ class AnalyzeDataStep:
                         f"Column '{col}': {valid_count} valid values, range {value_range}, samples: {sample_values}"
                     )
 
-            system_prompt = """You are an expert data analyst. Given numeric columns and a task description, 
+            system_prompt = """You are an expert data analyst. Given numeric columns and a task description,
             select the most relevant column for analysis.
-            
+
             Avoid columns that are:
             - Summary/total columns (containing "total", "sum", "world", etc.)
             - Year columns (4-digit numbers starting with 19xx or 20xx)
             - Rank/position columns (containing "rank", "position")
             - Index columns
-            
+
             Prefer columns with:
             - Values relevant to the analysis task
             - Good data completeness
             - Meaningful value ranges for comparison
-            
+
             Respond with ONLY the exact column name."""
 
             human_prompt = """Task: {task_description}
@@ -1523,9 +1472,7 @@ Which column is most relevant for this analysis? Respond with just the column na
             print(f"Error in LLM column selection: {str(e)}, using fallback")
             return self._fallback_column_selection(data, numeric_cols)
 
-    def _fallback_column_selection(
-        self, data: pd.DataFrame, numeric_cols: List[str]
-    ) -> str:
+    def _fallback_column_selection(self, data: pd.DataFrame, numeric_cols: List[str]) -> str:
         """
         Fallback method for column selection when LLM is unavailable
         """
@@ -1538,8 +1485,7 @@ Which column is most relevant for this analysis? Respond with just the column na
 
             # Avoid summary/total/rank columns
             if any(
-                keyword in col_name
-                for keyword in ["world", "total", "sum", "rank", "position"]
+                keyword in col_name for keyword in ["world", "total", "sum", "rank", "position"]
             ):
                 continue
 
@@ -1561,12 +1507,13 @@ Which column is most relevant for this analysis? Respond with just the column na
                 best_score = score
                 best_col = col
 
-        # If no column found, use first numeric column
-        if not best_col and numeric_cols:
-            best_col = numeric_cols[0]
-
-        print(f"Fallback selected column: {best_col}")
-        return best_col
+        if best_col:
+            print(f"Fallback selected column: {best_col} (score: {best_score})")
+            return best_col
+        else:
+            # Last resort: return first numeric column
+            print("No good column found, using first numeric column")
+            return numeric_cols[0] if numeric_cols else None
 
     def _filter_summary_rows_with_llm(
         self, data: pd.DataFrame, task_description: str = ""
@@ -1624,9 +1571,7 @@ Respond with exact values separated by commas, or "NONE" if no summary rows foun
             # Parse LLM response and filter rows
             result_clean = result.strip().upper()
             if result_clean != "NONE":
-                rows_to_remove = [
-                    item.strip().strip("\"'") for item in result.split(",")
-                ]
+                rows_to_remove = [item.strip().strip("\"'") for item in result.split(",")]
                 before_count = len(data)
 
                 for row_value in rows_to_remove:
@@ -1678,10 +1623,7 @@ Respond with exact values separated by commas, or "NONE" if no summary rows foun
                     before_count = len(data)
                     for keyword in summary_keywords:
                         data = data[
-                            ~data[name_col]
-                            .astype(str)
-                            .str.lower()
-                            .str.contains(keyword, na=False)
+                            ~data[name_col].astype(str).str.lower().str.contains(keyword, na=False)
                         ]
 
                     after_count = len(data)
@@ -1732,7 +1674,10 @@ class VisualizeStep:
                     alpha=0.7,
                 )
                 plt.xticks(
-                    range(len(top_n_df)), top_n_df[name_col], rotation=45, ha="right"
+                    range(len(top_n_df)),
+                    top_n_df[name_col],
+                    rotation=45,
+                    ha="right",
                 )
                 plt.title(f"Top {len(top_n_df)} by {analysis_col}")
                 plt.xlabel(name_col)
@@ -1740,9 +1685,7 @@ class VisualizeStep:
 
             elif chart_type == "scatter":
                 # Enhanced scatter plot with auto-detection of x/y columns
-                numeric_cols = data_clean.select_dtypes(
-                    include=[np.number]
-                ).columns.tolist()
+                numeric_cols = data_clean.select_dtypes(include=[np.number]).columns.tolist()
                 x_col, y_col = self._select_scatter_columns(
                     numeric_cols, analysis_col, task_description
                 )
@@ -1759,8 +1702,8 @@ class VisualizeStep:
                         try:
                             from scipy import stats
 
-                            slope, intercept, r_value, p_value, std_err = (
-                                stats.linregress(clean_data[x_col], clean_data[y_col])
+                            slope, intercept, r_value, p_value, std_err = stats.linregress(
+                                clean_data[x_col], clean_data[y_col]
                             )
                             line = slope * clean_data[x_col] + intercept
                             plt.plot(
@@ -1929,12 +1872,10 @@ class VisualizeStep:
             from config import get_chat_model
 
             # Get column information for context
-            numeric_cols = data_clean.select_dtypes(
-                include=[np.number]
-            ).columns.tolist()
+            numeric_cols = data_clean.select_dtypes(include=[np.number]).columns.tolist()
             text_cols = data_clean.select_dtypes(include=["object"]).columns.tolist()
 
-            system_prompt = """You are a data visualization expert. Based on the task description and data characteristics, 
+            system_prompt = """You are a data visualization expert. Based on the task description and data characteristics,
             recommend the most appropriate chart type.
 
 Available chart types:
@@ -2001,10 +1942,7 @@ What chart type is most appropriate? Respond with just: bar, scatter, histogram,
             return "histogram"
         elif "time series" in task_lower or "over time" in task_lower:
             return "time_series"
-        elif any(
-            word in task_lower
-            for word in ["correlation", "vs", "versus", "relationship"]
-        ):
+        elif any(word in task_lower for word in ["correlation", "vs", "versus", "relationship"]):
             return "scatter"
         else:
             return "bar"
@@ -2070,9 +2008,7 @@ What chart type is most appropriate? Respond with just: bar, scatter, histogram,
         date_cols = []
         for col in data_clean.columns:
             col_lower = str(col).lower()
-            if any(
-                keyword in col_lower for keyword in ["year", "date", "time", "month"]
-            ):
+            if any(keyword in col_lower for keyword in ["year", "date", "time", "month"]):
                 date_cols.append(col)
         return date_cols
 
@@ -2101,7 +2037,10 @@ class AnswerQuestionsStep:
 
         if top_n_df is None or top_n_df.empty or analysis_col is None:
             print("ERROR: No data available for answering questions")
-            answers = {"error": "No data available for analysis", "status": "failed"}
+            answers = {
+                "error": "No data available for analysis",
+                "status": "failed",
+            }
         else:
             print(f"Analyzing top {len(top_n_df)} entries by {analysis_col}")
 
@@ -2110,7 +2049,11 @@ class AnswerQuestionsStep:
             # LLM-powered question interpretation and answering
             answers.update(
                 self._answer_questions_with_llm(
-                    data_clean, top_n_df, analysis_col, name_col, task_description
+                    data_clean,
+                    top_n_df,
+                    analysis_col,
+                    name_col,
+                    task_description,
                 )
             )
 
@@ -2144,9 +2087,7 @@ class AnswerQuestionsStep:
                 print(f"Range: {min_value:,.2f} to {max_value:,.2f}")
 
             # Correlation analysis if multiple numeric columns
-            numeric_cols = data_clean.select_dtypes(
-                include=[np.number]
-            ).columns.tolist()
+            numeric_cols = data_clean.select_dtypes(include=[np.number]).columns.tolist()
             if len(numeric_cols) >= 2:
                 correlations = {}
                 for i, col1 in enumerate(numeric_cols):
@@ -2155,7 +2096,7 @@ class AnswerQuestionsStep:
                             corr = data_clean[[col1, col2]].corr().iloc[0, 1]
                             correlations[f"{col1}_vs_{col2}"] = corr
                             print(f"Correlation {col1} vs {col2}: {corr:.3f}")
-                        except:
+                        except Exception:
                             pass
                 answers["correlations"] = correlations
 
@@ -2174,7 +2115,11 @@ class AnswerQuestionsStep:
             top_list = []
             for i, (idx, row) in enumerate(top_n_df.iterrows()):
                 top_list.append(
-                    {"rank": i + 1, "name": row[name_col], "value": row[analysis_col]}
+                    {
+                        "rank": i + 1,
+                        "name": row[name_col],
+                        "value": row[analysis_col],
+                    }
                 )
             answers["top_n_list"] = top_list
 
@@ -2183,9 +2128,7 @@ class AnswerQuestionsStep:
                 "analysis_column": analysis_col,
                 "name_column": name_col,
                 "total_items_analyzed": len(top_n_df),
-                "total_items_in_dataset": (
-                    len(data_clean) if data_clean is not None else 0
-                ),
+                "total_items_in_dataset": (len(data_clean) if data_clean is not None else 0),
                 "data_type": self._identify_data_type(analysis_col, task_description),
                 "domain": self._identify_domain(task_description),
             }
@@ -2233,26 +2176,18 @@ class AnswerQuestionsStep:
                 "top_n_count": len(top_n_df),
                 "analysis_column": analysis_col,
                 "name_column": name_col,
-                "max_value": (
-                    float(data_clean[analysis_col].max()) if len(data_clean) > 0 else 0
-                ),
-                "min_value": (
-                    float(data_clean[analysis_col].min()) if len(data_clean) > 0 else 0
-                ),
+                "max_value": (float(data_clean[analysis_col].max()) if len(data_clean) > 0 else 0),
+                "min_value": (float(data_clean[analysis_col].min()) if len(data_clean) > 0 else 0),
                 "average_value": (
                     float(data_clean[analysis_col].mean()) if len(data_clean) > 0 else 0
                 ),
             }
 
             # Get numeric columns for correlation analysis
-            numeric_cols = data_clean.select_dtypes(
-                include=[np.number]
-            ).columns.tolist()
+            numeric_cols = data_clean.select_dtypes(include=[np.number]).columns.tolist()
 
             # Get year column if exists for temporal questions
-            year_cols = [
-                col for col in data_clean.columns if "year" in str(col).lower()
-            ]
+            year_cols = [col for col in data_clean.columns if "year" in str(col).lower()]
 
             # Prepare top N data for LLM
             if len(top_n_df) >= 5:
@@ -2268,7 +2203,7 @@ class AnswerQuestionsStep:
             else:
                 top_5_items = []
 
-            system_prompt = """You are an expert data analyst. Based on the task description and data insights, 
+            system_prompt = """You are an expert data analyst. Based on the task description and data insights,
             answer specific questions that might be asked about the data.
 
 Common question types to address:
@@ -2332,9 +2267,7 @@ Respond with a JSON object containing relevant answers and insights."""
                 if "5th" in result.lower() and len(top_5_items) >= 5:
                     insights["llm_fifth_item_insight"] = top_5_items[4]["name"]
                 if "total" in result.lower():
-                    insights["llm_total_insight"] = sum(
-                        item["value"] for item in top_5_items
-                    )
+                    insights["llm_total_insight"] = sum(item["value"] for item in top_5_items)
                 if "average" in result.lower():
                     insights["llm_average_insight"] = data_insights["average_value"]
 
@@ -2360,10 +2293,7 @@ Respond with a JSON object containing relevant answers and insights."""
         ]
         col_lower = str(analysis_col).lower()
         task_lower = task_description.lower()
-        return any(
-            keyword in col_lower or keyword in task_lower
-            for keyword in financial_keywords
-        )
+        return any(keyword in col_lower or keyword in task_lower for keyword in financial_keywords)
 
     def _is_health_data(self, analysis_col: str, task_description: str) -> bool:
         """Check if this is health/medical data"""
@@ -2378,9 +2308,7 @@ Respond with a JSON object containing relevant answers and insights."""
         ]
         col_lower = str(analysis_col).lower()
         task_lower = task_description.lower()
-        return any(
-            keyword in col_lower or keyword in task_lower for keyword in health_keywords
-        )
+        return any(keyword in col_lower or keyword in task_lower for keyword in health_keywords)
 
     def _is_sports_data(self, analysis_col: str, task_description: str) -> bool:
         """Check if this is sports data"""
@@ -2397,9 +2325,7 @@ Respond with a JSON object containing relevant answers and insights."""
         ]
         col_lower = str(analysis_col).lower()
         task_lower = task_description.lower()
-        return any(
-            keyword in col_lower or keyword in task_lower for keyword in sports_keywords
-        )
+        return any(keyword in col_lower or keyword in task_lower for keyword in sports_keywords)
 
     def _is_economic_data(self, analysis_col: str, task_description: str) -> bool:
         """Check if this is economic data"""
@@ -2414,19 +2340,22 @@ Respond with a JSON object containing relevant answers and insights."""
         ]
         col_lower = str(analysis_col).lower()
         task_lower = task_description.lower()
-        return any(
-            keyword in col_lower or keyword in task_lower
-            for keyword in economic_keywords
-        )
+        return any(keyword in col_lower or keyword in task_lower for keyword in economic_keywords)
 
     def _is_entertainment_data(self, analysis_col: str, task_description: str) -> bool:
         """Check if this is entertainment data"""
-        entertainment_keywords = ["rating", "imdb", "score", "movie", "film", "review"]
+        entertainment_keywords = [
+            "rating",
+            "imdb",
+            "score",
+            "movie",
+            "film",
+            "review",
+        ]
         col_lower = str(analysis_col).lower()
         task_lower = task_description.lower()
         return any(
-            keyword in col_lower or keyword in task_lower
-            for keyword in entertainment_keywords
+            keyword in col_lower or keyword in task_lower for keyword in entertainment_keywords
         )
 
     def _answer_financial_questions(
@@ -2438,10 +2367,7 @@ Respond with a JSON object containing relevant answers and insights."""
         task_description: str,
     ):
         """Answer financial/revenue specific questions"""
-        if (
-            "billion" in str(analysis_col).lower()
-            or "billion" in task_description.lower()
-        ):
+        if "billion" in str(analysis_col).lower() or "billion" in task_description.lower():
             # Count items above certain thresholds
             above_1_5bn = len(data_clean[data_clean[analysis_col] > 1500])
             above_2bn = len(data_clean[data_clean[analysis_col] > 2000])
@@ -2451,7 +2377,12 @@ Respond with a JSON object containing relevant answers and insights."""
             print(f"Items above 2 billion: {above_2bn}")
 
     def _answer_health_questions(
-        self, answers: dict, data_clean, analysis_col: str, name_col: str, top_n_df
+        self,
+        answers: dict,
+        data_clean,
+        analysis_col: str,
+        name_col: str,
+        top_n_df,
     ):
         """Answer health/medical specific questions"""
         # Look for death rate calculations
@@ -2468,12 +2399,10 @@ Respond with a JSON object containing relevant answers and insights."""
 
         if deaths_col and cases_col:
             # Calculate death-to-case ratio
-            data_clean["death_rate"] = (
-                data_clean[deaths_col] / data_clean[cases_col] * 100
-            ).round(2)
-            highest_death_rate_country = data_clean.loc[
-                data_clean["death_rate"].idxmax(), name_col
-            ]
+            data_clean["death_rate"] = (data_clean[deaths_col] / data_clean[cases_col] * 100).round(
+                2
+            )
+            highest_death_rate_country = data_clean.loc[data_clean["death_rate"].idxmax(), name_col]
             highest_death_rate_value = data_clean["death_rate"].max()
 
             answers["highest_death_rate_country"] = highest_death_rate_country
@@ -2483,14 +2412,17 @@ Respond with a JSON object containing relevant answers and insights."""
             )
 
             # Global average calculations
-            global_death_rate = (
-                data_clean[deaths_col].sum() / data_clean[cases_col].sum() * 100
-            )
+            global_death_rate = data_clean[deaths_col].sum() / data_clean[cases_col].sum() * 100
             answers["global_average_death_rate"] = global_death_rate
             print(f"Global average death rate: {global_death_rate:.2f}%")
 
     def _answer_sports_questions(
-        self, answers: dict, data_clean, analysis_col: str, name_col: str, top_n_df
+        self,
+        answers: dict,
+        data_clean,
+        analysis_col: str,
+        name_col: str,
+        top_n_df,
     ):
         """Answer sports specific questions"""
         numeric_cols = data_clean.select_dtypes(include=[np.number]).columns.tolist()
@@ -2544,7 +2476,12 @@ Respond with a JSON object containing relevant answers and insights."""
             print(f"Highest rate: {highest_rate:.2f}")
 
     def _answer_entertainment_questions(
-        self, answers: dict, data_clean, analysis_col: str, name_col: str, top_n_df
+        self,
+        answers: dict,
+        data_clean,
+        analysis_col: str,
+        name_col: str,
+        top_n_df,
     ):
         """Answer entertainment/rating specific questions"""
         if "rating" in str(analysis_col).lower():
@@ -2562,12 +2499,15 @@ Respond with a JSON object containing relevant answers and insights."""
             decade_count = decade_counts.iloc[0]
             answers["most_movies_decade"] = f"{most_common_decade}s"
             answers["decade_movie_count"] = decade_count
-            print(
-                f"Decade with most top movies: {most_common_decade}s ({decade_count} movies)"
-            )
+            print(f"Decade with most top movies: {most_common_decade}s ({decade_count} movies)")
 
     def _answer_temporal_questions(
-        self, answers: dict, data_clean, analysis_col: str, name_col: str, year_col: str
+        self,
+        answers: dict,
+        data_clean,
+        analysis_col: str,
+        name_col: str,
+        year_col: str,
     ):
         """Answer time-based questions"""
         try:
@@ -2581,17 +2521,13 @@ Respond with a JSON object containing relevant answers and insights."""
 
             # Find earliest item above threshold (for financial data)
             if "billion" in str(analysis_col).lower():
-                above_threshold = data_clean[
-                    data_clean[analysis_col] > 1500
-                ].sort_values(year_col)
+                above_threshold = data_clean[data_clean[analysis_col] > 1500].sort_values(year_col)
                 if len(above_threshold) > 0:
                     earliest_item = above_threshold.iloc[0][name_col]
                     earliest_year = above_threshold.iloc[0][year_col]
                     answers["earliest_above_threshold"] = earliest_item
                     answers["earliest_year"] = earliest_year
-                    print(
-                        f"Earliest item above 1.5bn: {earliest_item} ({earliest_year})"
-                    )
+                    print(f"Earliest item above 1.5bn: {earliest_item} ({earliest_year})")
         except Exception as e:
             print(f"Error in temporal analysis: {str(e)}")
             # Set default values if temporal analysis fails
@@ -2619,7 +2555,7 @@ Respond with a JSON object containing relevant answers and insights."""
             from langchain.schema import StrOutputParser
             from config import get_chat_model
 
-            system_prompt = """You are a data domain classifier. 
+            system_prompt = """You are a data domain classifier.
 Classify the data domain based on task description.
 
 Respond with ONE of these domains:
@@ -2667,7 +2603,13 @@ Respond with only the domain name."""
         """Fallback domain identification using keywords"""
         task_lower = task_description.lower()
 
-        financial_keywords = ["revenue", "profit", "gdp", "economics", "trading"]
+        financial_keywords = [
+            "revenue",
+            "profit",
+            "gdp",
+            "economics",
+            "trading",
+        ]
         entertainment_keywords = ["movie", "film", "rating", "imdb", "tv"]
         health_keywords = ["covid", "coronavirus", "medical", "disease"]
         sports_keywords = ["cricket", "football", "basketball", "espn"]
