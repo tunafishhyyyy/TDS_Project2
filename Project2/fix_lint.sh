@@ -2,7 +2,7 @@
 
 # Script to fix common Flake8 issues in web_scraping_steps.py
 
-FILE="chains/base.py"
+FILE="chains/workflows.py"
 
 
 echo "Fixing Flake8 issues in $FILE..."
