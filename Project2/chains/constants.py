@@ -20,7 +20,9 @@ COMMON_DATA_CLASSES = [
 
 # Numeric cleaning patterns
 CURRENCY_SYMBOLS = ['$', '€', '£', '¥', '₹']
-SCALE_INDICATORS = ['billion', 'million', 'trillion', 'bn', 'mn', 'B', 'M', 'K']
+SCALE_INDICATORS = [
+    'billion', 'million', 'trillion', 'bn', 'mn', 'B', 'M', 'K'
+]
 FOOTNOTE_PATTERNS = [
     r'\[.*?\]',        # [1], [n 1], etc.
     r'\([^)]*\)',      # Parentheses content
