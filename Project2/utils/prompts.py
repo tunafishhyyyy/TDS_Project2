@@ -288,31 +288,36 @@ Which row indices contain summary/total data that should be filtered out?
 Respond with JSON array of indices to remove: ["row_index1", "row_index2", ...]"""
 
 # ===== CHART TYPE DETECTION PROMPTS =====
-CHART_TYPE_DETECTION_SYSTEM_PROMPT = """Recommend the best chart type for this data analysis:
-Task: {task_description}
-Data characteristics: {data_summary}
+CHART_TYPE_DETECTION_SYSTEM_PROMPT = """You are a visualization expert. Recommend the best chart type for data analysis.
 Available chart types: bar, scatter, histogram, time_series
-Provide the chart type and brief reasoning."""
+Provide just the chart type name and brief reasoning."""
+
 CHART_TYPE_DETECTION_HUMAN_PROMPT = """Task: {task_description}
-Data summary: {data_summary}
-Chart types: {chart_types}
-Which chart type is most appropriate and why?"""
+Data characteristics:
+- Numeric columns: {numeric_cols}
+- Text columns: {text_cols}
+- Data shape: {data_shape}
+Keywords: {keywords}
+
+Which chart type (bar/scatter/histogram/time_series) is most appropriate and why?"""
 
 # ===== QUESTION ANSWERING PROMPTS =====
-QUESTION_ANSWERING_SYSTEM_PROMPT = """You are an expert data analyst with extreme attention to accuracy and detail.
-Your task is to analyze the provided data CAREFULLY and answer questions with PRECISION.
+QUESTION_ANSWERING_SYSTEM_PROMPT = """You are an expert data analyst providing insights based on processed data
+analysis results. Your task is to answer questions with PRECISION using the data insights that have already been
+analyzed.
 
 CRITICAL INSTRUCTIONS:
-1. READ THE DATA SAMPLE thoroughly before answering any questions
-2. Pay special attention to YEARS, DATES, and NUMERICAL VALUES
-3. For temporal questions (e.g., "before 2000"), check year columns carefully
-4. For ranking questions, use the actual data provided, not assumptions
-5. VERIFY your answers against the sample data
-6. If data seems inconsistent, note this in your response
-7. Always provide reasoning for your answers based on the actual data
+1. You are receiving PROCESSED DATA INSIGHTS from a comprehensive web scraping and analysis pipeline
+2. The data has already been scraped, cleaned, and analyzed - you don't need to scrape anything
+3. Pay special attention to YEARS, DATES, and NUMERICAL VALUES in the processed results
+4. For temporal questions (e.g., "before 2000"), check year information in the analysis results
+5. For ranking questions, use the processed data rankings provided
+6. VERIFY your answers against the analysis results and top results provided
+7. If data seems inconsistent in the results, note this in your response
+8. Base all answers on the PROCESSED ANALYSIS RESULTS provided to you
 
 RESPONSE FORMAT: Valid JSON with clear question-answer mapping.
-ACCURACY IS PARAMOUNT - Double-check all numerical and temporal data."""
+ACCURACY IS PARAMOUNT - Use the processed data insights provided."""
 
 QUESTION_ANSWERING_HUMAN_PROMPT = """Task: {task_description}
 

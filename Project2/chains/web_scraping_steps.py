@@ -842,6 +842,7 @@ class ScrapeTableStep:
         Pre-filter tables to reduce LLM token usage while maintaining quality
         Returns list of (original_index, table) tuples for promising tables
         """
+        import re  # Import for pattern matching
         keywords = keywords or []
         keyword_set = set(word.lower() for word in keywords)
         
@@ -885,6 +886,26 @@ class ScrapeTableStep:
                 diversity_score = len(set(str(val) for val in table.iloc[:, 0] if pd.notna(val)))
                 if diversity_score / min(table.shape[0], 10) < 0.3:  # Less than 30% diversity
                     score -= 10  # Penalty for repetitive content
+            
+            # Special handling for revenue/financial data
+            if keywords and any(word in ['gross', 'revenue', 'billion', 'money'] for word in keywords):
+                # Check for clean numeric data patterns in gross/revenue columns
+                gross_cols = [col for col in table.columns if 'gross' in str(col).lower()]
+                if gross_cols:
+                    sample_values = table[gross_cols[0]].astype(str).head(5).tolist()
+                    # Prefer tables with clean numeric formats like "$2,923,706,026"
+                    clean_format_count = sum(1 for val in sample_values 
+                                           if re.match(r'^\$[\d,]+$', str(val)))
+                    if clean_format_count >= 3:  # At least 3 clean format values
+                        print(f"Table {i} has clean revenue format, boosting score")
+                        score += 20  # Significant bonus for clean revenue data
+                    
+                    # Penalize tables with complex/messy formats
+                    messy_format_count = sum(1 for val in sample_values 
+                                           if ('–' in str(val) or '(' in str(val) or 'R' in str(val)))
+                    if messy_format_count >= 2:
+                        print(f"Table {i} has messy revenue format, reducing score")
+                        score -= 15  # Penalty for messy revenue data
             
             candidate_tables.append((i, table, score))
         
@@ -1023,10 +1044,22 @@ class CleanDataStep:
         print("\n=== CLEANING DATA ===")
         print(f"Original data types:\n{data.dtypes}")
 
+        # Define columns that should NOT be converted to numeric
+        text_columns = ['Title', 'Ref']  # Movie titles and references should stay as text
+        
         # Clean each column
         task_description = input_data.get("task_description", "")
         keywords = extract_keywords(task_description)
         for col in data.columns:
+            # Skip columns that should remain as integers
+            if col in ['Rank', 'Year']:
+                continue
+                
+            # Skip text columns that should never be converted to numeric
+            if col in text_columns:
+                print(f"\nSkipping text column: {col} (keeping as text)")
+                continue
+                
             if data[col].dtype == "object":
                 print(f"\nCleaning column: {col}")
                 # Convert to string first
@@ -1052,6 +1085,53 @@ class CleanDataStep:
                 cleaned = cleaned.str.replace("M", "", regex=False)  # Million abbreviation
                 cleaned = cleaned.str.replace("K", "", regex=False)  # Thousand abbreviation
 
+                # Enhanced cleaning for Wikipedia-style data
+                # First handle complex ranges and multiple values
+                
+                # Handle ranges like "$50,000,000–100,000,000" - take the lower value to avoid concatenation
+                range_pattern = r'(\d+(?:,\d{3})*(?:\.\d+)?)[–\-]+(\d+(?:,\d{3})*(?:\.\d+)?)'
+                import re
+                def extract_range_safe(text):
+                    matches = re.findall(range_pattern, str(text))
+                    if matches:
+                        # Take the LOWER value to avoid unrealistic concatenated numbers
+                        values = []
+                        for match in matches:
+                            try:
+                                val1 = float(match[0].replace(',', ''))
+                                val2 = float(match[1].replace(',', ''))
+                                values.extend([val1, val2])
+                            except:
+                                continue
+                        if values:
+                            chosen_val = min(values)  # Take minimum to avoid concatenated numbers
+                            # Validate the value is reasonable (not concatenated mess)
+                            if chosen_val > 100_000_000_000:  # More than 100B is unrealistic
+                                return '0'  # Return 0 for invalid values
+                            return str(chosen_val)
+                    return str(text)
+                
+                cleaned = cleaned.apply(extract_range_safe)
+                
+                # Handle multiple dollar amounts - take the first significant one
+                # Pattern like "$20,000,000+R ($5,200,000)R" -> take first amount
+                multi_amount_pattern = r'\$(\d+(?:,\d{3})*(?:\.\d+)?)'
+                def extract_first_amount(text):
+                    matches = re.findall(multi_amount_pattern, str(text))
+                    if matches:
+                        # Take the first (usually primary) amount
+                        try:
+                            val = float(matches[0].replace(',', ''))
+                            # Validate the value is reasonable
+                            if val > 100_000_000_000:  # More than 100B is unrealistic
+                                return '0'  # Return 0 for invalid values
+                        except:
+                            return '0'
+                        return matches[0]
+                    return str(text)
+                
+                cleaned = cleaned.apply(extract_first_amount)
+                
                 # Remove footnote references like [1], [n 1], etc.
                 cleaned = cleaned.str.replace(r"\[.*?\]", "", regex=True)
                 cleaned = cleaned.str.replace(
@@ -1072,6 +1152,12 @@ class CleanDataStep:
 
                 # Convert to numeric
                 numeric_data = pd.to_numeric(cleaned, errors="coerce")
+                
+                # Additional outlier filtering for financial data
+                if 'gross' in col.lower() or 'revenue' in col.lower() or 'box' in col.lower():
+                    # Cap at reasonable maximum for movie revenues (50B would be extreme)
+                    numeric_data = numeric_data.where(numeric_data <= 50_000_000_000, np.nan)
+                    print(f"  Applied movie revenue outlier filtering for {col}")
 
                 # Only replace if we got some valid numbers (at least 5% of data should be numeric)
                 valid_count = numeric_data.notna().sum()
