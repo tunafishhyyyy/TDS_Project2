@@ -8,6 +8,7 @@ Libraries to use: {libraries}
 Output format: {output_format}
 
 Requirements:
+0. Use `requests.get` with appropriate headers to fetch HTML content before parsing.
 1. Use pandas for data manipulation
 2. Use matplotlib/seaborn for visualizations
 3. Include error handling
@@ -256,7 +257,35 @@ Data sample (showing identifier and analysis columns):
 {data_sample}
 
 Which row indices contain summary/total data that should be filtered out?
-Respond with JSON array of indices to remove."""
+Respond with JSON array of indices to remove: ["row_index1", "row_index2", ...]"""
+
+# ===== CHART TYPE DETECTION PROMPTS =====
+CHART_TYPE_DETECTION_SYSTEM_PROMPT = """Recommend the best chart type for this data analysis:
+Task: {task_description}
+Data characteristics: {data_summary}
+Available chart types: bar, scatter, histogram, time_series
+Provide the chart type and brief reasoning."""
+CHART_TYPE_DETECTION_HUMAN_PROMPT = """Task: {task_description}
+Data summary: {data_summary}
+Chart types: {chart_types}
+Which chart type is most appropriate and why?"""
+
+# ===== QUESTION ANSWERING PROMPTS =====
+QUESTION_ANSWERING_SYSTEM_PROMPT = """You are an expert data analyst.
+Use the processed data and visualizations to answer the questions.
+Provide concise, accurate responses to each question.
+Respond in JSON format with question-answer mapping."""
+QUESTION_ANSWERING_HUMAN_PROMPT = """Task: {task_description}
+
+Data Analysis Results:
+{data_insights}
+
+Chart/Visualization: {chart_description}
+
+Top Results:
+{top_results}
+
+Please provide comprehensive answers to the questions in the task, using the data analysis results and insights."""
 
 # Code Generation Prompt
 CODE_GENERATION_PROMPT = """You are a Python data analysis expert.

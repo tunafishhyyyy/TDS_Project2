@@ -9,7 +9,7 @@ from datetime import datetime
 import logging
 from chains.base import BaseWorkflow, WorkflowOrchestrator
 from langchain.chains import LLMChain
-from langchain_core.prompts import ChatPromptTemplate
+from langchain.prompts import ChatPromptTemplate
 from utils.prompts import (
     EDA_SYSTEM_PROMPT,
     EDA_HUMAN_PROMPT,
@@ -929,9 +929,7 @@ class AdvancedWorkflowOrchestrator(WorkflowOrchestrator):
                 "predictive_modeling": PredictiveModelingWorkflow(llm=self.llm) if self.llm else None,
                 "data_visualization": DataVisualizationWorkflow(llm=self.llm) if self.llm else None,
                 "web_scraping": WebScrapingWorkflow(llm=self.llm) if self.llm else None,
-                "multi_step_web_scraping": (
-                    MultiStepWebScrapingWorkflow(llm=self.llm) if self.llm else ModularWebScrapingWorkflow()
-                ),
+                "multi_step_web_scraping": ModularWebScrapingWorkflow(),
                 "database_analysis": DatabaseAnalysisWorkflow(llm=self.llm) if self.llm else None,
                 "statistical_analysis": StatisticalAnalysisWorkflow(llm=self.llm) if self.llm else None,
             }

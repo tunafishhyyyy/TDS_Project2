@@ -17,7 +17,7 @@ from config import OPENAI_API_KEY, DEFAULT_MODEL, TEMPERATURE, MAX_TOKENS, EMBED
 # LangChain components
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain.memory import ConversationBufferWindowMemory
-from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
+from langchain.prompts import ChatPromptTemplate, PromptTemplate
 from langchain.chains import LLMChain
 
 # Ensure project root is on path

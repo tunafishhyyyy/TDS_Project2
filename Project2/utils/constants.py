@@ -401,6 +401,8 @@ CHART_TYPE_TIME_SERIES = "time_series"
 
 # Visualization formats
 VISUALIZATION_FORMAT_BASE64 = "base64_data_uri"
+# Alias for output format
+OUTPUT_FORMAT_BASE64 = VISUALIZATION_FORMAT_BASE64
 
 # ===== API CONSTANTS =====
 
@@ -522,3 +524,21 @@ CONFIDENCE_HIGH = "high"
 
 # Script types
 SCRIPT_TYPE_JSON_LD = "application/ld+json"
+
+# ===== DOMAIN TYPE CONSTANTS =====
+DATA_TYPE_FINANCIAL = "financial"
+DATA_TYPE_HEALTH = "health"
+DATA_TYPE_SPORTS = "sports"
+DATA_TYPE_ECONOMIC = "economic"
+DATA_TYPE_ENTERTAINMENT = "entertainment"
+DATA_TYPE_OTHER = "other"
+DATA_TYPE_RANKING = "ranking"
+
+# ===== DATABASE & FORMAT CONSTANTS =====
+DATABASE_TYPE_SQL = "sql"
+FILE_FORMAT_PARQUET = "parquet"
+
+# ===== CONTENT TYPE CONSTANTS =====
+CONTENT_TYPE_JSON = "application/json"
+CONTENT_TYPE_CSV = "text/csv"
+CONTENT_TYPE_TEXT = "text/plain"
