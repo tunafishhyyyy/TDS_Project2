@@ -8,3 +8,4 @@ Answer the following questions and respond with a JSON array of strings containi
 3. What's the correlation between the Rank and Peak?
 4. Draw a scatterplot of Rank and Peak along with a dotted red regression line through it.
    Return as a base-64 encoded data URI, `"data:image/png;base64,iVBORw0KG..."` under 100,000 bytes.
+   

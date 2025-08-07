@@ -7,6 +7,7 @@ import pandas as pd
 import json
 from datetime import datetime
 import logging
+import re
 from chains.base import BaseWorkflow, WorkflowOrchestrator
 from langchain.chains import LLMChain
 from langchain.prompts import ChatPromptTemplate
@@ -903,19 +904,23 @@ class AdvancedWorkflowOrchestrator(WorkflowOrchestrator):
         super().__init__()
         # Initialize LLM for workflow detection
         try:
-            from langchain_openai import ChatOpenAI
-            from config import OPENAI_API_KEY, DEFAULT_MODEL, TEMPERATURE, MAX_TOKENS
+            from config import get_chat_model, OPENAI_API_KEY, GEMINI_API_KEY
 
-            if not OPENAI_API_KEY:
-                raise ValueError("OpenAI API key not found")
+            # Prefer OpenAI if available, otherwise fallback to Gemini
+            if OPENAI_API_KEY:
+                self.llm = get_chat_model(provider="openai")
+                logger.info("LLM initialized successfully using OpenAI.")
+            elif GEMINI_API_KEY:
+                self.llm = get_chat_model(provider="gemini")
+                logger.info("LLM initialized successfully using Gemini as a fallback.")
+            else:
+                # If no key is available, we cannot proceed with this orchestrator
+                raise ValueError("No OpenAI or Gemini API key found. Cannot initialize LLM for AdvancedWorkflowOrchestrator.")
 
-            self.llm = ChatOpenAI(
-                model=DEFAULT_MODEL, temperature=TEMPERATURE, max_tokens=MAX_TOKENS, api_key=OPENAI_API_KEY
-            )
-            logger.info("LLM initialized successfully")
         except Exception as e:
-            logger.warning(f"Could not initialize LLM for workflow detection: {e}")
-            self.llm = None
+            logger.error(f"Critical error initializing LLM for AdvancedWorkflowOrchestrator: {e}")
+            # Re-raise the exception to be caught by the main application logic
+            raise e
 
         # Add specialized workflows including multi-modal support
         # Only initialize workflows that require LLM if LLM is available

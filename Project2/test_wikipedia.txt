@@ -1,0 +1,6 @@
+Scrape movie data from:
+https://en.wikipedia.org/wiki/List_of_highest-grossing_films
+
+Then create a visualization and answer:
+1. What movie first grossed over $2 billion worldwide?
+2. What was the earliest movie to gross over $1.5 billion worldwide?

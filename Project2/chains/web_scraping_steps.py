@@ -52,11 +52,20 @@ def sanitize_for_json(obj):
     """
     Recursively sanitize dicts/lists/floats for JSON serialization.
     Converts NaN, inf, -inf to None.
+    Converts numpy types to Python native types.
     """
     if isinstance(obj, dict):
         return {k: sanitize_for_json(v) for k, v in obj.items()}
     elif isinstance(obj, list):
         return [sanitize_for_json(v) for v in obj]
+    elif isinstance(obj, (np.integer, np.int64, np.int32)):
+        return int(obj)
+    elif isinstance(obj, (np.floating, np.float64, np.float32)):
+        if math.isnan(obj) or math.isinf(obj):
+            return None
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return sanitize_for_json(obj.tolist())
     elif isinstance(obj, float):
         if math.isnan(obj) or math.isinf(obj):
             return None
@@ -342,19 +351,8 @@ class ScrapeTableStep:
 
         except Exception as e:
             print(f"Error in primary extraction strategy: {str(e)}")
-            print("Falling back to traditional table scraping...")
-
-            # Ensure we have soup for fallback
-            if soup is None:
-                try:
-                    response = requests.get(url, headers=REQUEST_HEADERS)
-                    response.raise_for_status()
-                    soup = BeautifulSoup(response.text, "html.parser")
-                except Exception as fallback_error:
-                    print(f"Failed to fetch content for fallback: {str(fallback_error)}")
-                    raise e  # Re-raise original error
-
-            data = self._fallback_table_extraction(soup, task_description)
+            # NO FALLBACK - Raise exception to ensure proper LLM-driven data extraction
+            raise ValueError(f"Failed to extract data using LLM-guided strategy: {str(e)}")
 
         return sanitize_for_json({"data": data, "url": url, "format_analysis": format_analysis})
 
@@ -746,41 +744,6 @@ class ScrapeTableStep:
 
         return df
 
-    def _fallback_table_extraction(self, soup, task_description: str) -> pd.DataFrame:
-        """
-        Ultimate fallback: traditional table extraction
-        """
-        print("Using fallback table extraction method...")
-
-        # Try pandas.read_html on the entire page
-        try:
-            tables = pd.read_html(str(soup))
-            if tables:
-                # Use simple heuristics to select best table
-                best_table = max(tables, key=lambda t: t.shape[0] * t.shape[1])
-                return best_table
-        except Exception:
-            pass
-
-        # Manual extraction from any table-like structure
-        rows = soup.find_all("tr")
-        if rows:
-            extracted = []
-            for row in rows:
-                cells = row.find_all(["th", "td"])
-                if cells:
-                    extracted.append([cell.get_text(strip=True) for cell in cells])
-
-            if extracted:
-                # Use first row as header if consistent column count
-                if len(extracted) > 1 and len(extracted[0]) == len(extracted[1]):
-                    df = pd.DataFrame(extracted[1:], columns=extracted[0])
-                else:
-                    df = pd.DataFrame(extracted)
-                return df
-
-        raise ValueError("Could not extract any tabular data from the webpage")
-
     def _select_best_table_with_llm(
         self,
         tables: List[pd.DataFrame],
@@ -790,102 +753,149 @@ class ScrapeTableStep:
         """
         Use LLM to intelligently select the most relevant table for analysis
         Based on task description and table previews
+        NO FALLBACK - Raises exception if LLM fails to ensure proper table selection
         """
+        # Import LLM components here to avoid circular imports
+        from langchain.prompts import ChatPromptTemplate
+        from langchain.schema import StrOutputParser
+        from config import get_chat_model
+
+        print(f"Original table count: {len(tables)}")
+        
+        # Pre-filter tables to reduce token usage while maintaining LLM-only approach
+        filtered_tables = self._pre_filter_tables_for_llm(tables, keywords)
+        print(f"After pre-filtering: {len(filtered_tables)} tables")
+        
+        if len(filtered_tables) == 0:
+            raise ValueError("No suitable tables found after pre-filtering")
+        
+        # If still too many tables (limit to 10 for GPT-4 token constraints), 
+        # take the best ones by size and data density
+        if len(filtered_tables) > 10:
+            print(f"Still too many tables ({len(filtered_tables)}), selecting top 10 by size and content")
+            # Sort by a simple score: rows * columns * numeric_columns
+            def table_score(table):
+                numeric_cols = len(table.select_dtypes(include=[np.number]).columns)
+                return table.shape[0] * table.shape[1] * (1 + numeric_cols)
+            
+            scored_tables = [(i, table, table_score(table)) for i, table in filtered_tables]
+            scored_tables.sort(key=lambda x: x[2], reverse=True)
+            filtered_tables = [(i, table) for i, table, score in scored_tables[:10]]
+            print(f"Selected top 10 tables with best content scores")
+
+        # Create table previews for LLM analysis (only for filtered tables)
+        table_previews = []
+        original_indices = []
+        for filtered_idx, (original_idx, table) in enumerate(filtered_tables):
+            # Get sample of first row only for each table (reduced to save tokens)
+            preview = {
+                "index": filtered_idx,  # Use filtered index for LLM
+                "original_index": original_idx,  # Track original index
+                "shape": f"{table.shape[0]} rows × {table.shape[1]} columns",
+                "columns": table.columns.tolist()[:5],  # Reduced to 5 columns
+                "sample_data": table.head(1).to_string(max_cols=5, max_rows=1),  # Just 1 row
+            }
+            table_previews.append(preview)
+            original_indices.append(original_idx)
+
+        # Format table information for LLM (very compact format)
+        table_info_str = ""
+        for preview in table_previews:
+            table_info_str += f"Table {preview['index']}: {preview['shape']}\n"
+            table_info_str += f"Cols: {preview['columns'][:3]}...\n"  # Show only first 3 columns
+            table_info_str += f"Sample: {preview['sample_data'][:100]}...\n"  # Truncate sample to 100 chars
+            table_info_str += "---\n"  # Shorter separator
+
+        # Use correct prompt variables from utils.prompts
+        prompt = ChatPromptTemplate.from_messages(
+            [("system", TABLE_SELECTION_SYSTEM_PROMPT), ("human", TABLE_SELECTION_HUMAN_PROMPT)]
+        )
+
+        # Get LLM model and create chain
+        llm = get_chat_model()
+        chain = prompt | llm | StrOutputParser()
+
+        # Invoke LLM with table data
+        result = chain.invoke(
+            {
+                "task_description": task_description or "general data analysis",
+                "keywords": ", ".join(keywords) if keywords else "",
+                "table_info": table_info_str,
+                "max_index": len(filtered_tables) - 1,
+            }
+        )
+
+        # Parse LLM response to get table index
         try:
-            # Import LLM components here to avoid circular imports
-            from langchain.prompts import ChatPromptTemplate
-            from langchain.schema import StrOutputParser
-            from config import get_chat_model
+            selected_filtered_index = int(result.strip())
+            if 0 <= selected_filtered_index < len(filtered_tables):
+                selected_original_index = original_indices[selected_filtered_index]
+                print(f"LLM selected filtered table {selected_filtered_index} (original table {selected_original_index}) for task: {task_description}")
+                return selected_original_index
+            else:
+                raise ValueError(f"LLM returned invalid index {selected_filtered_index}, expected 0-{len(filtered_tables)-1}")
+        except (ValueError, AttributeError) as e:
+            raise ValueError(f"Could not parse LLM response '{result}': {str(e)}")
 
-            # Create table previews for LLM analysis
-            table_previews = []
-            for i, table in enumerate(tables):
-                # Get sample of first 3 rows for each table
-                preview = {
-                    "index": i,
-                    "shape": f"{table.shape[0]} rows × {table.shape[1]} columns",
-                    "columns": table.columns.tolist()[:10],  # Limit to first 10 columns
-                    "sample_data": table.head(3).to_string(max_cols=10, max_rows=3),
-                }
-                table_previews.append(preview)
-
-            # Create LLM prompt for table selection
-
-            # Format table information for LLM
-            table_info_str = ""
-            for preview in table_previews:
-                table_info_str += f"\nTable {preview['index']}: {preview['shape']}\n"
-                table_info_str += f"Columns: {preview['columns']}\n"
-                table_info_str += f"Sample data:\n{preview['sample_data']}\n"
-                table_info_str += "-" * 50 + "\n"
-
-            # Use correct prompt variables from utils.prompts
-            prompt = ChatPromptTemplate.from_messages(
-                [("system", TABLE_SELECTION_SYSTEM_PROMPT), ("human", TABLE_SELECTION_HUMAN_PROMPT)]
-            )
-
-            # Get LLM model and create chain
-            llm = get_chat_model()
-            chain = prompt | llm | StrOutputParser()
-
-            # Invoke LLM with table data
-            result = chain.invoke(
-                {
-                    "task_description": task_description or "general data analysis",
-                    "keywords": ", ".join(keywords) if keywords else "",
-                    "table_info": table_info_str,
-                    "max_index": len(tables) - 1,
-                }
-            )
-
-            # Parse LLM response to get table index
-            try:
-                selected_index = int(result.strip())
-                if 0 <= selected_index < len(tables):
-                    print(f"LLM selected table {selected_index} for task: {task_description}")
-                    return selected_index
-                else:
-                    print(f"LLM returned invalid index {selected_index}, using fallback")
-                    return self._fallback_table_selection(tables)
-            except (ValueError, AttributeError):
-                print(f"Could not parse LLM response: {result}, using fallback")
-                return self._fallback_table_selection(tables)
-
-        except Exception as e:
-            print(f"Error in LLM table selection: {str(e)}, using fallback")
-            return self._fallback_table_selection(tables)
-
-    def _fallback_table_selection(self, tables: List[pd.DataFrame]) -> int:
+    def _pre_filter_tables_for_llm(self, tables: List[pd.DataFrame], keywords: List[str] = None) -> List[tuple]:
         """
-        Fallback method for table selection when LLM is unavailable
-        Uses simple heuristics based on table size and content
+        Pre-filter tables to reduce LLM token usage while maintaining quality
+        Returns list of (original_index, table) tuples for promising tables
         """
-        if not tables:
-            return 0
-
-        best_idx = 0
-        best_score = 0
-
+        keywords = keywords or []
+        keyword_set = set(word.lower() for word in keywords)
+        
+        candidate_tables = []
+        
         for i, table in enumerate(tables):
+            # Skip obviously unusable tables
+            if table.shape[0] < 2 or table.shape[1] < 2:  # Too small
+                continue
+            if table.shape[0] > 1000:  # Probably too large/repetitive
+                continue
+                
+            # Calculate content quality score
             score = 0
-
-            # Prefer tables with reasonable size (10+ rows, 2+ columns)
-            if table.shape[0] >= 10:
-                score += min(table.shape[0] * 0.5, 50)
-            if table.shape[1] >= 2:
-                score += table.shape[1] * 5
-
-            # Prefer tables with numeric data
-            numeric_cols = table.select_dtypes(include=[np.number]).columns
-            score += len(numeric_cols) * 10
-
-            if score > best_score:
-                best_score = score
-                best_idx = i
-
-        print(f"Fallback selection: table {best_idx} (score: {best_score})")
-        return best_idx
-
+            
+            # Size factor (prefer substantial but not huge tables)
+            row_score = min(table.shape[0] / 10, 10)  # Max 10 points for rows
+            col_score = min(table.shape[1] * 2, 10)   # Max 10 points for columns
+            score += row_score + col_score
+            
+            # Content relevance (check column names and sample data)
+            content_text = " ".join(str(col) for col in table.columns).lower()
+            sample_text = " ".join(str(val) for val in table.iloc[:3].values.flatten() if pd.notna(val)).lower()
+            all_text = content_text + " " + sample_text
+            
+            # Keyword matching
+            if keywords:
+                keyword_matches = sum(1 for word in keyword_set if word in all_text)
+                score += keyword_matches * 5  # 5 points per keyword match
+            
+            # Data density (prefer tables with actual data vs empty/sparse)
+            non_null_ratio = table.notna().sum().sum() / (table.shape[0] * table.shape[1])
+            score += non_null_ratio * 10
+            
+            # Numeric data bonus (good for analysis)
+            numeric_cols = len(table.select_dtypes(include=[np.number]).columns)
+            score += numeric_cols * 2
+            
+            # Avoid tables with too many identical values (formatting tables)
+            if table.shape[0] > 5:
+                diversity_score = len(set(str(val) for val in table.iloc[:, 0] if pd.notna(val)))
+                if diversity_score / min(table.shape[0], 10) < 0.3:  # Less than 30% diversity
+                    score -= 10  # Penalty for repetitive content
+            
+            candidate_tables.append((i, table, score))
+        
+        # Sort by score and return top candidates
+        candidate_tables.sort(key=lambda x: x[2], reverse=True)
+        
+        # Take top candidates (more conservative limit before LLM selection)
+        top_candidates = candidate_tables[:min(20, len(candidate_tables))]
+        print(f"Pre-filtering selected {len(top_candidates)} promising tables from {len(tables)} total")
+        
+        return [(i, table) for i, table, score in top_candidates]
 
 class InspectTableStep:
     """
@@ -955,80 +965,48 @@ class InspectTableStep:
         """
         Use LLM to intelligently detect if any row contains headers
         Returns (is_header, row_index) tuple
+        NO FALLBACK - Raises exception if LLM fails to ensure proper header detection
         """
-        try:
-            from langchain.prompts import ChatPromptTemplate
-            from langchain.schema import StrOutputParser
-            from config import get_chat_model
+        from langchain.prompts import ChatPromptTemplate
+        from langchain.schema import StrOutputParser
+        from config import get_chat_model
 
-            # Check first 3 rows for potential headers
-            rows_to_check = min(3, len(data))
-            table_sample = data.head(rows_to_check).to_string(max_cols=10)
+        # Check first 3 rows for potential headers
+        rows_to_check = min(3, len(data))
+        table_sample = data.head(rows_to_check).to_string(max_cols=10)
 
-            prompt = ChatPromptTemplate.from_messages(
-                [("system", HEADER_DETECTION_SYSTEM_PROMPT), ("human", HEADER_DETECTION_HUMAN_PROMPT)]
-            )
-
-            llm = get_chat_model()
-            chain = prompt | llm | StrOutputParser()
-
-            result = chain.invoke(
-                {
-                    "task_description": task_description or "general data analysis",
-                    "keywords": ", ".join(keywords) if keywords else "",
-                    "table_sample": table_sample,
-                    "rows_count": rows_to_check,
-                    "current_columns": data.columns.tolist(),
-                }
-            )
-
-            # Parse LLM response
-            result_clean = result.strip().upper()
-            if result_clean == "NONE":
-                print("LLM determined no headers in data rows")
-                return False, None
-            else:
-                try:
-                    header_row = int(result_clean)
-                    if 0 <= header_row < rows_to_check:
-                        print(f"LLM detected headers in row {header_row}")
-                        return True, header_row
-                    else:
-                        print(f"LLM returned invalid row index: {result}, using fallback")
-                        return self._fallback_header_detection(data)
-                except ValueError:
-                    print(f"Could not parse LLM response: {result}, using fallback")
-                    return self._fallback_header_detection(data)
-
-        except Exception as e:
-            print(f"Error in LLM header detection: {str(e)}, using fallback")
-            return self._fallback_header_detection(data)
-
-    def _fallback_header_detection(self, data: pd.DataFrame) -> tuple:
-        """
-        Fallback method for header detection when LLM is unavailable
-        """
-        # Check if column names are non-descriptive
-        has_unnamed_cols = any(
-            str(col).startswith("Unnamed") or str(col).isdigit() for col in data.columns
+        prompt = ChatPromptTemplate.from_messages(
+            [("system", HEADER_DETECTION_SYSTEM_PROMPT), ("human", HEADER_DETECTION_HUMAN_PROMPT)]
         )
 
-        if has_unnamed_cols and len(data) > 0:
-            # Check first row for header-like content
-            first_row_values = data.iloc[0].astype(str).tolist()
-            # Simple check for text that looks like headers
-            header_like_count = sum(
-                1
-                for val in first_row_values
-                if len(str(val)) > 1 and not str(val).replace(".", "").replace("-", "").isdigit()
-            )
+        llm = get_chat_model()
+        chain = prompt | llm | StrOutputParser()
 
-            if header_like_count >= len(first_row_values) * 0.5:  # At least half look like headers
-                print("Fallback detected likely headers in first row")
-                return True, 0
+        result = chain.invoke(
+            {
+                "task_description": task_description or "general data analysis",
+                "keywords": ", ".join(keywords) if keywords else "",
+                "table_sample": table_sample,
+                "rows_count": rows_to_check,
+                "current_columns": data.columns.tolist(),
+            }
+        )
 
-        print("Fallback found no headers in data rows")
-        return False, None
+        # Parse LLM response
+        result_clean = result.strip().upper()
+        if result_clean == "NONE":
+            print("LLM determined no headers in data rows")
+            return False, None
+        else:
+            try:
+                header_row = int(result_clean)
+                if 0 <= header_row < rows_to_check:
+                    print(f"LLM detected headers in row {header_row}")
+                    return True, header_row
+                else:
+                    raise ValueError(f"LLM returned invalid row index: {result}, expected 0-{rows_to_check-1}")
+            except ValueError as e:
+                raise ValueError(f"Could not parse LLM response '{result}': {str(e)}")
 
 
 class CleanDataStep:
@@ -1948,20 +1926,42 @@ class AnswerQuestionsStep:
 
             # Get year column if exists for temporal questions
             year_cols = [col for col in data_clean.columns if "year" in str(col).lower()]
+            
+            # Get all columns to help LLM understand the data structure
+            all_columns = list(data_clean.columns)
 
-            # Prepare top N data for LLM
+            # Prepare detailed data sample for verification
+            sample_data = []
+            if len(data_clean) > 0:
+                # Get top 10 rows with all relevant columns for LLM to analyze
+                sample_size = min(10, len(data_clean))
+                for i in range(sample_size):
+                    row_dict = {}
+                    for col in all_columns[:6]:  # Limit to first 6 columns to avoid overwhelming
+                        try:
+                            row_dict[col] = str(data_clean.iloc[i][col])
+                        except:
+                            row_dict[col] = "N/A"
+                    sample_data.append(row_dict)
+
+            # Prepare top N data for LLM with more context
             if len(top_n_df) >= 5:
-                top_5_items = []
-                for i in range(min(5, len(top_n_df))):
-                    top_5_items.append(
-                        {
-                            "rank": i + 1,
-                            "name": str(top_n_df.iloc[i][name_col]),
-                            "value": float(top_n_df.iloc[i][analysis_col]),
-                        }
-                    )
+                top_10_items = []  # Increase to top 10 for better analysis
+                for i in range(min(10, len(top_n_df))):
+                    row_data = {}
+                    row_data["rank"] = i + 1
+                    for col in all_columns[:4]:  # Include more columns for context
+                        try:
+                            value = top_n_df.iloc[i][col]
+                            if pd.isna(value):
+                                row_data[col] = "N/A"
+                            else:
+                                row_data[col] = str(value)
+                        except:
+                            row_data[col] = "N/A"
+                    top_10_items.append(row_data)
             else:
-                top_5_items = []
+                top_10_items = []
 
             prompt = ChatPromptTemplate.from_messages(
                 [("system", QUESTION_ANSWERING_SYSTEM_PROMPT), ("human", QUESTION_ANSWERING_HUMAN_PROMPT)]
@@ -1970,18 +1970,42 @@ class AnswerQuestionsStep:
             llm = get_chat_model()
             chain = prompt | llm | StrOutputParser()
 
+            # Format comprehensive data insights for the prompt template
+            data_insights_str = f"""
+DATASET OVERVIEW:
+- Total rows: {data_insights['total_rows']}
+- Primary analysis column: {analysis_col}
+- Name/identifier column: {name_col}
+- All available columns: {', '.join(all_columns)}
+- Value range: {data_insights['min_value']:,.2f} to {data_insights['max_value']:,.2f}
+- Average value: {data_insights['average_value']:,.2f}
+
+SAMPLE DATA (first {len(sample_data)} rows):
+{chr(10).join([f"Row {i+1}: {row}" for i, row in enumerate(sample_data)])}
+
+TEMPORAL INFO:
+- Year columns found: {', '.join(year_cols) if year_cols else 'None detected'}
+- Numeric columns: {', '.join(numeric_cols)}
+            """.strip()
+            
+            chart_description_str = f"Scatter plot visualization of {analysis_col} data with regression line"
+            
+            top_results_str = f"TOP {len(top_10_items)} RANKED ITEMS:\n" + "\n".join([
+                f"Rank {item['rank']}: " + ", ".join([f"{k}: {v}" for k, v in item.items() if k != 'rank'])
+                for item in top_10_items
+            ]) if top_10_items else "No ranked items available"
+
+            print("DEBUG: Sending detailed data to LLM for analysis...")
+            print(f"Sample data points: {len(sample_data)}")
+            print(f"Top items for analysis: {len(top_10_items)}")
+            print(f"Columns available: {all_columns}")
+
             result = chain.invoke(
                 {
                     "task_description": task_description,
-                    "total_rows": data_insights["total_rows"],
-                    "analysis_column": analysis_col,
-                    "min_value": data_insights["min_value"],
-                    "max_value": data_insights["max_value"],
-                    "average_value": data_insights["average_value"],
-                    "top_n_count": data_insights["top_n_count"],
-                    "numeric_cols": numeric_cols[:5],  # Limit for context
-                    "year_cols": year_cols,
-                    "top_5_data": str(top_5_items),
+                    "data_insights": data_insights_str,
+                    "chart_description": chart_description_str,
+                    "top_results": top_results_str,
                 }
             )
 

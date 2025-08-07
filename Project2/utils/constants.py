@@ -9,7 +9,7 @@ TIMEOUT = 180  # seconds
 MATPLOTLIB_BACKEND = "Agg"  # Non-interactive backend for Docker
 
 # LangChain Model Configuration (from config.py)
-DEFAULT_MODEL = "gpt-3.5-turbo"
+# Model configuration is now handled in config.py via get_chat_model()
 TEMPERATURE = 0.7
 MAX_TOKENS = 2000
 

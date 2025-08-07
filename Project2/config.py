@@ -15,14 +15,14 @@ LANGCHAIN_TRACING_V2 = os.getenv("LANGCHAIN_TRACING_V2", "false")
 LANGCHAIN_API_KEY = os.getenv("LANGCHAIN_API_KEY")
 
 # Model Configuration
-DEFAULT_OPENAI_MODEL = "gpt-4"  # Renamed for clarity
-DEFAULT_GEMINI_MODEL = "gemini-pro"  # Added for Gemini
-TEMPERATURE = 0.7
-MAX_TOKENS = 5000
+DEFAULT_OPENAI_MODEL = "gpt-4"  # Upgraded to GPT-4 for better accuracy
+DEFAULT_GEMINI_MODEL = "gemini-pro"
+TEMPERATURE = 0.3  # Lower temperature for more accurate analysis
+MAX_TOKENS = 4000
 
 # Vector Store Configuration
 VECTOR_STORE_TYPE = "chromadb"  # Options: chromadb, faiss
-EMBEDDING_MODEL = "text-embedding-gpt-4"
+EMBEDDING_MODEL = "text-embedding-ada-002"  # Reverted for stability
 
 # Chain Configuration
 CHAIN_TIMEOUT = 120  # seconds

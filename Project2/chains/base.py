@@ -12,10 +12,10 @@ from langchain.callbacks.manager import CallbackManagerForChainRun
 
 
 # Configuration constants
-from config import OPENAI_API_KEY, DEFAULT_MODEL, TEMPERATURE, MAX_TOKENS, EMBEDDING_MODEL
+from config import get_chat_model, EMBEDDING_MODEL, OPENAI_API_KEY
 
 # LangChain components
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_openai import OpenAIEmbeddings
 from langchain.memory import ConversationBufferWindowMemory
 from langchain.prompts import ChatPromptTemplate, PromptTemplate
 from langchain.chains import LLMChain
@@ -31,19 +31,10 @@ logger = logging.getLogger(__name__)
 class BaseWorkflow(ABC):
     """Base class for LangChain workflows"""
 
-    def __init__(self, model_name: str = DEFAULT_MODEL, temperature: float = TEMPERATURE, **kwargs):
-        self.model_name = model_name
-        self.temperature = temperature
-
+    def __init__(self, llm=None, **kwargs):
         try:
-            # Initialize OpenAI Chat model
-            object.__setattr__(
-                self,
-                "llm",
-                ChatOpenAI(
-                    model=self.model_name, temperature=self.temperature, max_tokens=MAX_TOKENS, api_key=OPENAI_API_KEY
-                ),
-            )
+            # Use the provided LLM or get the default one
+            self.llm = llm or get_chat_model()
 
             object.__setattr__(self, "embeddings", OpenAIEmbeddings(model=EMBEDDING_MODEL, api_key=OPENAI_API_KEY))
 
@@ -52,7 +43,7 @@ class BaseWorkflow(ABC):
                 self, "memory", ConversationBufferWindowMemory(k=10, return_messages=True)  # Keep last 10 interactions
             )
 
-            logger.info(f"Initialized {self.__class__.__name__} with model {self.model_name}")
+            logger.info(f"Initialized {self.__class__.__name__} with model {self.llm.model_name}")
 
         except Exception as e:
             logger.error(f"Failed to initialize components: {e}")
@@ -72,8 +63,8 @@ class BaseWorkflow(ABC):
 class DataAnalysisChain(BaseWorkflow):
     """Chain for data analysis tasks"""
 
-    def __init__(self, model_name: str = DEFAULT_MODEL, temperature: float = TEMPERATURE, **kwargs):
-        super().__init__(model_name=model_name, temperature=temperature)
+    def __init__(self, llm=None, **kwargs):
+        super().__init__(llm=llm)
         self.prompt_template = self._create_analysis_prompt()
         self.chain = LLMChain(llm=self.llm, prompt=self.prompt_template)
 
@@ -267,7 +258,7 @@ class WorkflowOrchestrator:
 
     def __init__(self):
         self.workflows = {
-            "data_analysis": DataAnalysisChain(model_name=DEFAULT_MODEL, temperature=TEMPERATURE),
+            "data_analysis": DataAnalysisChain(),
             "code_generation": CodeGenerationChain(),
             "report_generation": ReportGenerationChain(),
         }

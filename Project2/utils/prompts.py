@@ -146,48 +146,76 @@ Container Analysis:
 Which container contains the data and how should it be extracted?"""
 
 # Table Selection Prompts
-TABLE_SELECTION_SYSTEM_PROMPT = """You are an expert web scraping assistant. Given multiple HTML tables from a webpage,
-select the most relevant table for data analysis based on the task description.
+TABLE_SELECTION_SYSTEM_PROMPT = """You are an expert web scraping assistant specialized in identifying the primary data table from multiple HTML tables extracted from a webpage.
 
-Consider these factors:
-1. Table size and data density
-2. Column relevance to the task
-3. Data quality and completeness
-4. Avoid summary/navigation tables
+CRITICAL: Your selection determines the accuracy of the entire analysis. Choose the table that contains the MAIN dataset for analysis.
 
-Respond with ONLY the table index number (0, 1, 2, etc.) that best matches the analysis requirements."""
+Selection criteria (in order of importance):
+1. **Content relevance**: Table contains data directly related to the task (movies, countries, sports, etc.)
+2. **Data completeness**: Table has substantial rows with meaningful data (avoid navigation, summary, or stub tables)
+3. **Column structure**: Table has relevant columns for analysis (ranks, names, numerical values)
+4. **Data density**: Prioritize tables with more complete data over sparse tables
+5. **Size appropriateness**: Large enough for analysis (typically 20+ rows) but not just repetitive formatting
 
-TABLE_SELECTION_HUMAN_PROMPT = """Task: {task_description}
-Keywords/entities: {keywords}
+AVOID:
+- Navigation tables (menus, links)
+- Summary/total tables (single rows with totals)
+- Reference/citation tables 
+- Tables with mostly empty cells
+- Formatting/layout tables
 
-Available tables:
+Respond with ONLY the table index number (0, 1, 2, etc.) of the PRIMARY data table."""
+
+TABLE_SELECTION_HUMAN_PROMPT = """Analysis Task: {task_description}
+Relevant Keywords: {keywords}
+
+AVAILABLE TABLES WITH PREVIEWS:
 {table_info}
 
-Which table index (0-{max_index}) contains the most relevant data for this analysis?
-Respond with just the number."""
+INSTRUCTIONS:
+Examine each table's shape, columns, and sample data carefully.
+Identify which table contains the PRIMARY dataset for "{task_description}".
+Focus on tables with substantial data rows and relevant columns.
+
+Respond with ONLY the table index number (0-{max_index}) that contains the main analysis data."""
 
 # Header Detection Prompts
-HEADER_DETECTION_SYSTEM_PROMPT = """You are an expert data analyst. Examine the first few rows of a table and
-determine if any row contains column headers.
+HEADER_DETECTION_SYSTEM_PROMPT = """You are an expert data analyst specializing in table structure analysis.
 
-Look for:
-1. Descriptive names instead of data values
-2. Text patterns typical of headers (Name, Rank, Total, etc.)
-3. Consistency with the analysis task
-4. Non-numeric values in what should be data rows
+Your task: Determine if any of the first few data rows contains column headers that should replace the current column names.
 
-Respond with ONLY the row index (0, 1, 2) that contains headers, or "NONE" if no headers are found in the data rows."""
+HEADER IDENTIFICATION CRITERIA:
+1. **Descriptive names**: Row contains descriptive text like "Rank", "Film", "Year", "Gross" rather than data values
+2. **Data type mismatch**: Row has text values in what appear to be numeric columns  
+3. **Pattern consistency**: Values look like column names throughout the row
+4. **Context relevance**: Header names match the analysis context
 
-HEADER_DETECTION_HUMAN_PROMPT = """Task: {task_description}
-Keywords/entities: {keywords}
+IMPORTANT: Only identify rows that contain BETTER headers than the current column names.
+If current columns are already descriptive, respond "NONE".
 
-Table sample (first {rows_count} rows):
-{table_sample}
+Respond with ONLY:
+- The row index (0, 1, 2) if that row contains proper headers
+- "NONE" if no headers found in the sample rows"""
 
+HEADER_DETECTION_HUMAN_PROMPT = """Analysis Context: {task_description}
+Keywords: {keywords}
+
+TABLE STRUCTURE ANALYSIS:
 Current column names: {current_columns}
 
-Which row index (0, 1, 2) contains the headers, or "NONE" if headers are not in the data rows?
-Respond with just the number or "NONE"."""
+Sample data (first {rows_count} rows):
+{table_sample}
+
+QUESTION: Do any of these {rows_count} sample rows contain better column headers than the current column names?
+
+Examine each row:
+- Row 0: Does this look like headers rather than data?
+- Row 1: Does this look like headers rather than data?
+- Row 2: Does this look like headers rather than data?
+
+Respond with ONLY:
+- The row number (0, 1, or 2) if that row has proper headers
+- "NONE" if no sample rows contain headers"""
 
 # Workflow Detection Prompts
 WORKFLOW_DETECTION_SYSTEM_PROMPT = """You are an expert workflow classifier for data analysis tasks.
@@ -271,21 +299,41 @@ Chart types: {chart_types}
 Which chart type is most appropriate and why?"""
 
 # ===== QUESTION ANSWERING PROMPTS =====
-QUESTION_ANSWERING_SYSTEM_PROMPT = """You are an expert data analyst.
-Use the processed data and visualizations to answer the questions.
-Provide concise, accurate responses to each question.
-Respond in JSON format with question-answer mapping."""
+QUESTION_ANSWERING_SYSTEM_PROMPT = """You are an expert data analyst with extreme attention to accuracy and detail.
+Your task is to analyze the provided data CAREFULLY and answer questions with PRECISION.
+
+CRITICAL INSTRUCTIONS:
+1. READ THE DATA SAMPLE thoroughly before answering any questions
+2. Pay special attention to YEARS, DATES, and NUMERICAL VALUES
+3. For temporal questions (e.g., "before 2000"), check year columns carefully
+4. For ranking questions, use the actual data provided, not assumptions
+5. VERIFY your answers against the sample data
+6. If data seems inconsistent, note this in your response
+7. Always provide reasoning for your answers based on the actual data
+
+RESPONSE FORMAT: Valid JSON with clear question-answer mapping.
+ACCURACY IS PARAMOUNT - Double-check all numerical and temporal data."""
+
 QUESTION_ANSWERING_HUMAN_PROMPT = """Task: {task_description}
+
+IMPORTANT: The following is REAL DATA from the analysis. Use this data to answer questions accurately:
 
 Data Analysis Results:
 {data_insights}
 
 Chart/Visualization: {chart_description}
 
-Top Results:
+Top Results (VERIFY against this data):
 {top_results}
 
-Please provide comprehensive answers to the questions in the task, using the data analysis results and insights."""
+INSTRUCTIONS:
+1. Examine the sample data rows carefully
+2. Look for year information in the data
+3. Cross-reference rankings and values
+4. Answer each question based on the ACTUAL DATA provided
+5. If you cannot find sufficient data to answer a question accurately, state so
+
+Please provide accurate answers in JSON format, showing your reasoning based on the data provided."""
 
 # Code Generation Prompt
 CODE_GENERATION_PROMPT = """You are a Python data analysis expert.
