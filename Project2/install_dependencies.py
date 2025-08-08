@@ -1,11 +1,10 @@
-#!/usr/bin/env python3
+#!/usr / bin / env python3
 """
-Install missing dependencies for multi-step web scraping workflow
+Install missing dependencies for multi - step web scraping workflow
 """
 
 import subprocess
 import sys
-import os
 
 def install_dependencies():
     """Install required dependencies"""
@@ -15,9 +14,9 @@ def install_dependencies():
         'html5lib',
         'numpy'
     ]
-    
+
     print("Installing missing dependencies...")
-    
+
     for dep in dependencies:
         try:
             print(f"Installing {dep}...")
@@ -27,9 +26,9 @@ def install_dependencies():
             print(f"✗ Failed to install {dep}: {e}")
         except Exception as e:
             print(f"✗ Error installing {dep}: {e}")
-    
+
     print("\nDependency installation completed!")
-    print("You can now run the multi-step web scraping workflow.")
+    print("You can now run the multi - step web scraping workflow.")
 
 if __name__ == "__main__":
-    install_dependencies() 
+    install_dependencies()

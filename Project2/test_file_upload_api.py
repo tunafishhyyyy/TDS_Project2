@@ -5,7 +5,6 @@ Demonstrates how to use the new file upload functionality
 
 import requests
 import time
-import json
 
 # Base URL - change this to your actual API URL
 BASE_URL = "http://localhost:8000"
@@ -14,10 +13,10 @@ def test_file_upload():
     """Test file upload functionality (LangChain workflow)"""
     print("🔄 Testing file upload...")
     with open("dummy.txt", "rb") as f:
-        files = {"file": ("dummy.txt", f, "text/plain")}
+        files = {"file": ("dummy.txt", f, "text / plain")}
         data = {
             "workflow_type": "data_analysis",
-            "business_context": "E-commerce platform analysis"
+            "business_context": "E - commerce platform analysis"
         }
         response = requests.post(f"{BASE_URL}/api/", files=files, data=data)
     if response.status_code == 200:
@@ -48,9 +47,10 @@ def test_form_data():
     else:
         print(f"❌ Form data submission failed: {response.status_code}")
         print(response.text)
-        return None
+    return None
 
 ## Legacy endpoint test removed
+
 
 def check_task_status(task_id):
     """Check the status of a task (LangChain workflow)"""
@@ -58,7 +58,7 @@ def check_task_status(task_id):
         return
     print(f"\n🔄 Checking status for task: {task_id}")
     time.sleep(3)
-    response = requests.get(f"{BASE_URL}/api/tasks/{task_id}/status")
+    response = requests.get(f"{BASE_URL}/api / tasks/{task_id}/status")
     if response.status_code == 200:
         result = response.json()
         print(f"✅ Status: {result['status']}")

@@ -4,41 +4,25 @@
 # ===== SYSTEM CONFIGURATION =====
 
 # API Version and basic settings
-API_VERSION_CONFIG = "v1"  # From config.py
 TIMEOUT = 180  # seconds
-MATPLOTLIB_BACKEND = "Agg"  # Non-interactive backend for Docker
+MATPLOTLIB_BACKEND = "Agg"  # Non - interactive backend for Docker
 
-# LangChain Model Configuration (from config.py)
-# Model configuration is now handled in config.py via get_chat_model()
-TEMPERATURE = 0.7
-MAX_TOKENS = 2000
-
-# Vector Store Configuration
-VECTOR_STORE_TYPE = "chromadb"  # Options: chromadb, faiss
-EMBEDDING_MODEL = "text-embedding-ada-002"
-
-# Chain Configuration
-CHAIN_TIMEOUT = 120  # seconds
-MAX_RETRIES = 3
-
-# Environment Variables (these should be loaded from .env)
-OPENAI_API_KEY_ENV = "OPENAI_API_KEY"
-LANGCHAIN_TRACING_V2_ENV = "LANGCHAIN_TRACING_V2"
-LANGCHAIN_API_KEY_ENV = "LANGCHAIN_API_KEY"
+# Note: Model configuration (TEMPERATURE, MAX_TOKENS, EMBEDDING_MODEL, etc.)
+# is now handled in config.py via get_chat_model() to avoid duplication
 
 # ===== HTTP AND WEB SCRAPING CONSTANTS =====
 
-# Standard User-Agent for web requests
+# Standard User-Agent for web requests (no spaces in token separators)
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
 )
 
-# Standard request headers
+# Standard request headers (use proper header names)
 REQUEST_HEADERS = {
     "User-Agent": USER_AGENT,
     "Accept-Language": "en-US,en;q=0.9",
-    "Referer": "https://www.google.com/"
+    "Referer": "https://www.google.com/",
 }
 
 # ===== DATA PROCESSING CONSTANTS =====
@@ -56,7 +40,7 @@ SCALE_INDICATORS = [
 FOOTNOTE_PATTERNS = [
     r'\[.*?\]',        # [1], [n 1], etc.
     r'\([^)]*\)',      # Parentheses content
-    r'[^\d.\-]'        # Non-numeric except decimal and minus
+    r'[^\d.\-]'        # Non - numeric except decimal and minus
 ]
 
 # Text processing constants
@@ -103,7 +87,7 @@ KEY_VISUALIZATION_FORMAT = "visualization_format"
 KEY_MAX_SIZE = "max_size"
 
 # Step numbers and processing
-STEP_0_DATA_FORMAT_DETECTION = "Step 0: LLM-powered data format detection"
+STEP_0_DATA_FORMAT_DETECTION = "Step 0: LLM - powered data format detection"
 STEP_1_TABLE_EXTRACTION = "Step 1: Extract tables from webpage"
 STEP_2_DATA_CLEANING = "Step 2: Clean and prepare extracted data"
 STEP_3_CHART_TYPE_DETECTION = "Step 3: Detect appropriate chart type using LLM"
@@ -136,9 +120,9 @@ ENGLISH_STOPWORDS = {
     "how", "why", "it", "its", "but", "not",
 }
 
-# Content selectors for non-table data extraction
+# Content selectors for non - table data extraction
 CONTENT_SELECTORS = [
-    ".chart", ".data-table", ".list", ".grid", ".content",
+    ".chart", ".data - table", ".list", ".grid", ".content",
     "[class*='chart']", "[class*='table']", "[class*='list']",
 ]
 
@@ -185,7 +169,7 @@ SCRAPING_KEYWORDS = [
     "site",
 ]
 
-# Multi-step workflow indicators
+# Multi - step workflow indicators
 MULTI_STEP_KEYWORDS = [
     "clean",
     "plot",
@@ -223,7 +207,7 @@ TEXT_KEYWORDS = [
     "text mining",
 ]
 
-# Legal/Court keywords
+# Legal / Court keywords
 LEGAL_KEYWORDS = [
     "court", "judgment", "legal", "case", "disposal", "judge",
     "cnr", "ecourts", "law", "litigation"
@@ -408,15 +392,15 @@ OUTPUT_FORMAT_BASE64 = VISUALIZATION_FORMAT_BASE64
 
 # API metadata
 API_TITLE = "Data Analysis API"
-API_DESCRIPTION = "An API that uses LLMs to source, prepare, analyze, and visualize any data with multi-modal support."
+API_DESCRIPTION = "An API that uses LLMs to source, prepare, analyze, and visualize any data with multi - modal support."
 API_VERSION = "2.0.0"
 
 # API features
 API_FEATURES = [
     "Multiple file upload support",
     "Synchronous processing",
-    "LLM-based workflow detection",
-    "Multi-modal analysis (text, image, code)",
+    "LLM - based workflow detection",
+    "Multi - modal analysis (text, image, code)",
     "12+ specialized workflows",
 ]
 
@@ -448,7 +432,7 @@ TIMEOUT_SECONDS = 180  # 3 minutes
 MAX_SIZE_BYTES = "100000 bytes"  # String version for output requirements
 
 # Encoding
-ENCODING = "utf-8"
+ENCODING = "utf - 8"
 
 # Table processing parameters
 TABLE_HEAD_ROWS = 3
@@ -475,8 +459,8 @@ HTTP_TIMEOUT = 408
 HTTP_INTERNAL_ERROR = 500
 
 # Container and deployment constants
-CONTAINER_IMAGE_NAME = "data-analysis-api"
-CONTAINER_NAME = "data-analysis-api-container"
+CONTAINER_IMAGE_NAME = "data - analysis - api"
+CONTAINER_NAME = "data - analysis - api - container"
 CONTAINER_PORT = 8000
 
 # System paths (chain imports)
@@ -523,7 +507,7 @@ CONFIDENCE_MEDIUM = "medium"
 CONFIDENCE_HIGH = "high"
 
 # Script types
-SCRIPT_TYPE_JSON_LD = "application/ld+json"
+SCRIPT_TYPE_JSON_LD = "application / ld + json"
 
 # ===== DOMAIN TYPE CONSTANTS =====
 DATA_TYPE_FINANCIAL = "financial"
@@ -539,6 +523,6 @@ DATABASE_TYPE_SQL = "sql"
 FILE_FORMAT_PARQUET = "parquet"
 
 # ===== CONTENT TYPE CONSTANTS =====
-CONTENT_TYPE_JSON = "application/json"
-CONTENT_TYPE_CSV = "text/csv"
-CONTENT_TYPE_TEXT = "text/plain"
+CONTENT_TYPE_JSON = "application / json"
+CONTENT_TYPE_CSV = "text / csv"
+CONTENT_TYPE_TEXT = "text / plain"

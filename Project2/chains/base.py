@@ -293,7 +293,7 @@ class WorkflowOrchestrator:
             return {"error": str(e), "workflow_type": workflow_type, "timestamp": datetime.now().isoformat()}
 
     async def execute_multi_step_workflow(self, steps: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Execute a multi-step workflow where outputs can feed into next steps"""
+        """Execute a multi - step workflow where outputs can feed into next steps"""
         results = {}
         context = {}
 

@@ -1,24 +1,15 @@
-We need to test the following example :
 
-Scrape the list of highest grossing films from Wikipedia. It is at the URL:
-https://en.wikipedia.org/wiki/List_of_highest-grossing_films
 
-Answer the following questions and respond with a JSON array of strings containing the answer.
-
-1. How many $2 bn movies were released before 2000?
-2. Which is the earliest film that grossed over $1.5 bn?
-3. What's the correlation between the Rank and Peak?
-4. Draw a scatterplot of Rank and Peak along with a dotted red regression line through it.
-   Return as a base-64 encoded data URI, `"data:image/png;base64,iVBORw0KG..."` under 100,000 bytes.
 
 == Improtant Instructions ==
 
-* While running in Agent mode Pls do not run the commands on this machine directly the actual python code and API server runs inside a Docker container, 
-Direct commands will not work.
-python is not installed directly installed in the host machine but installed inside the docker all the tests should either run using curl command on from inside the docker container 
+* While running in Agent mode Pls do not run the commands on this machine directly the actual python code and API server runs inside a Docker container,  application is installed inside docker all the tests should either run using curl command on from inside the docker container 
 
 * No need to create test scripts unless its specifically mentioned in the context
 * No need to create Instruction md files unless its specifically mentioned in the context
 * These are not the final questions I be evaluated on. These examples are indicative.
   so data scraping needs to be generic and prompts as well. Make data scraping generic and prompts generic. The scraping logic and prompts
   should work for any table, not just any one use case.
+* code linter used : flake8 we need to enable venv before running flake8
+* when you start a new terminal enable venv  
+* to run the linter we can also use fix_lint.sh (after modifying appropriately)

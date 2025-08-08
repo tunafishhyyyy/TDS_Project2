@@ -29,7 +29,7 @@ from utils.prompts import (
 )
 
 # Set matplotlib backend after import
-matplotlib.use(MATPLOTLIB_BACKEND)  # Set non-interactive backend for Docker
+matplotlib.use(MATPLOTLIB_BACKEND)  # Set non - interactive backend for Docker
 
 
 def extract_keywords(task_description: str) -> List[str]:
@@ -50,7 +50,7 @@ def extract_keywords(task_description: str) -> List[str]:
 
 def sanitize_for_json(obj):
     """
-    Recursively sanitize dicts/lists/floats for JSON serialization.
+    Recursively sanitize dicts / lists / floats for JSON serialization.
     Converts NaN, inf, -inf to None.
     Converts numpy types to Python native types.
     """
@@ -77,9 +77,18 @@ def sanitize_for_json(obj):
 logger = logging.getLogger(__name__)
 
 
+def fetch_html(url: str, timeout: int = 20) -> str:
+    """Fetch HTML with proper headers via a session to avoid 400/403 blocks."""
+    session = requests.Session()
+    session.headers.update(REQUEST_HEADERS)
+    resp = session.get(url, timeout=timeout)
+    resp.raise_for_status()
+    return resp.text
+
+
 class DetectDataFormatStep:
     """
-    Step 0: LLM-powered data format detection
+    Step 0: LLM - powered data format detection
     - Analyze webpage HTML structure to detect data availability
     - Identify data format (HTML tables, JSON, JavaScript variables)
     - Provide extraction strategy recommendations
@@ -92,11 +101,10 @@ class DetectDataFormatStep:
 
         try:
             # Fetch webpage content with standard headers
-            response = requests.get(url, headers=REQUEST_HEADERS)
-            response.raise_for_status()
+            html = fetch_html(url)
 
             # Parse HTML content
-            soup = BeautifulSoup(response.text, HTML_PARSER)
+            soup = BeautifulSoup(html, HTML_PARSER)
 
             # Analyze page structure with LLM
             format_analysis = self._analyze_data_format_with_llm(soup, task_description, url)
@@ -112,7 +120,7 @@ class DetectDataFormatStep:
                 "url": url,
                 "task_description": task_description,
                 "format_analysis": format_analysis,
-                "html_content": response.text,
+                "html_content": html,
                 "soup": soup,
             }
 
@@ -221,12 +229,12 @@ class DetectDataFormatStep:
         json_scripts = 0
         data_scripts = 0
         for script in scripts:
-            if script.get("type") == "application/ld+json":
+            if script.get("type") == "application / ld + json":
                 json_scripts += 1
             elif script.string and ("data" in script.string.lower() or "{" in script.string):
                 data_scripts += 1
         structure_info.append(
-            f"Script tags: {len(scripts)} total, {json_scripts} JSON-LD, "
+            f"Script tags: {len(scripts)} total, {json_scripts} JSON - LD, "
             f"{data_scripts} with data"
         )
 
@@ -267,7 +275,7 @@ class DetectDataFormatStep:
                     except json.JSONDecodeError:
                         continue
 
-        # Fallback: search all script tags for JSON-like content
+        # Fallback: search all script tags for JSON - like content
         if not json_data:
             scripts = soup.find_all("script")
             for script in scripts:
@@ -333,10 +341,8 @@ class ScrapeTableStep:
                 soup = input_data["soup"]
                 html_content = input_data.get("html_content", "")
             else:
-                response = requests.get(url, headers=REQUEST_HEADERS)
-                response.raise_for_status()
-                soup = BeautifulSoup(response.text, "html.parser")
-                html_content = response.text
+                html_content = fetch_html(url)
+                soup = BeautifulSoup(html_content, HTML_PARSER)
 
             # Extract data based on detected format
             data = self._extract_data_by_strategy(
@@ -351,8 +357,25 @@ class ScrapeTableStep:
 
         except Exception as e:
             print(f"Error in primary extraction strategy: {str(e)}")
-            # NO FALLBACK - Raise exception to ensure proper LLM-driven data extraction
-            raise ValueError(f"Failed to extract data using LLM-guided strategy: {str(e)}")
+            # Graceful fallback: try pandas.read_html on full page content
+            try:
+                if not html_content:
+                    html_content = fetch_html(url)
+                dfs = pd.read_html(html_content)
+                if not dfs:
+                    raise ValueError("pandas.read_html returned no tables")
+                # Choose the largest table by size as fallback
+                sizes = [df.shape[0] * df.shape[1] for df in dfs]
+                best_idx = int(np.argmax(sizes))
+                data = dfs[best_idx]
+                print(
+                    f"Fallback selected table {best_idx} with {data.shape[0]} rows and {data.shape[1]} columns"
+                )
+            except Exception as e2:
+                raise ValueError(
+                    f"Failed to extract data using LLM - guided strategy: {str(e)}; "
+                    f"fallback also failed: {str(e2)}"
+                )
 
         return sanitize_for_json({"data": data, "url": url, "format_analysis": format_analysis})
 
@@ -451,7 +474,7 @@ class ScrapeTableStep:
             print("  Sample data:")
             print(table.head(3))
 
-        # Use LLM-powered table selection
+        # Use LLM - powered table selection
         keywords = extract_keywords(task_description)
         best_table_idx = self._select_best_table_with_llm(tables, task_description, keywords)
         data = tables[best_table_idx]
@@ -464,7 +487,7 @@ class ScrapeTableStep:
 
     def _extract_from_non_table_elements(self, soup) -> List[pd.DataFrame]:
         """
-        Extract tabular data from non-table HTML elements
+        Extract tabular data from non - table HTML elements
         Enhanced to handle various website structures
         """
         tables = []
@@ -535,7 +558,7 @@ class ScrapeTableStep:
                 if isinstance(data_obj, list):
                     return pd.DataFrame(data_obj)
                 elif isinstance(data_obj, dict):
-                    # Find the first list/array in the JSON
+                    # Find the first list / array in the JSON
                     for key, value in data_obj.items():
                         if isinstance(value, list) and len(value) > 0:
                             return pd.DataFrame(value)
@@ -546,7 +569,7 @@ class ScrapeTableStep:
 
     def _extract_dataframe_from_json(self, data_obj, instructions: Dict) -> pd.DataFrame:
         """
-        Extract DataFrame from JSON using LLM-provided instructions
+        Extract DataFrame from JSON using LLM - provided instructions
         """
         # Navigate to data array using provided path
         current_data = data_obj
@@ -630,7 +653,7 @@ class ScrapeTableStep:
         """
         Parse extracted JavaScript data into DataFrame
         """
-        # Try to extract JSON-like structures from JavaScript
+        # Try to extract JSON - like structures from JavaScript
         json_pattern = r"(\{.*?\}|\[.*?\])"
         matches = re.findall(json_pattern, js_data, re.DOTALL)
 
@@ -725,7 +748,7 @@ class ScrapeTableStep:
         for row in rows:
             cells = row.select(cell_selector) if cell_selector else [row]
             cell_data = [cell.get_text(strip=True) for cell in cells]
-            if cell_data and any(cell_data):  # Only add non-empty rows
+            if cell_data and any(cell_data):  # Only add non - empty rows
                 data_rows.append(cell_data)
 
         if not data_rows:
@@ -735,7 +758,7 @@ class ScrapeTableStep:
         if headers and len(headers) == len(data_rows[0]):
             df = pd.DataFrame(data_rows, columns=headers)
         else:
-            # Auto-generate column names
+            # Auto - generate column names
             max_cols = max(len(row) for row in data_rows) if data_rows else 0
             columns = [f"Column_{i}" for i in range(max_cols)]
             # Pad rows to match column count
@@ -761,23 +784,24 @@ class ScrapeTableStep:
         from config import get_chat_model
 
         print(f"Original table count: {len(tables)}")
-        
-        # Pre-filter tables to reduce token usage while maintaining LLM-only approach
+
+        # Pre - filter tables to reduce token usage while maintaining LLM - only approach
         filtered_tables = self._pre_filter_tables_for_llm(tables, keywords)
-        print(f"After pre-filtering: {len(filtered_tables)} tables")
-        
+        print(f"After pre - filtering: {len(filtered_tables)} tables")
+
         if len(filtered_tables) == 0:
-            raise ValueError("No suitable tables found after pre-filtering")
-        
-        # If still too many tables (limit to 10 for GPT-4 token constraints), 
+            raise ValueError("No suitable tables found after pre - filtering")
+
+        # If still too many tables (limit to 10 for GPT - 4 token constraints),
         # take the best ones by size and data density
         if len(filtered_tables) > 10:
             print(f"Still too many tables ({len(filtered_tables)}), selecting top 10 by size and content")
             # Sort by a simple score: rows * columns * numeric_columns
+
             def table_score(table):
                 numeric_cols = len(table.select_dtypes(include=[np.number]).columns)
                 return table.shape[0] * table.shape[1] * (1 + numeric_cols)
-            
+
             scored_tables = [(i, table, table_score(table)) for i, table in filtered_tables]
             scored_tables.sort(key=lambda x: x[2], reverse=True)
             filtered_tables = [(i, table) for i, table, score in scored_tables[:10]]
@@ -806,117 +830,140 @@ class ScrapeTableStep:
             table_info_str += f"Sample: {preview['sample_data'][:100]}...\n"  # Truncate sample to 100 chars
             table_info_str += "---\n"  # Shorter separator
 
-        # Use correct prompt variables from utils.prompts
-        prompt = ChatPromptTemplate.from_messages(
-            [("system", TABLE_SELECTION_SYSTEM_PROMPT), ("human", TABLE_SELECTION_HUMAN_PROMPT)]
-        )
+        # Use correct prompt variables from utils.prompts and try LLM selection
+        try:
+            prompt = ChatPromptTemplate.from_messages(
+                [("system", TABLE_SELECTION_SYSTEM_PROMPT), ("human", TABLE_SELECTION_HUMAN_PROMPT)]
+            )
+            llm = get_chat_model()
+            chain = prompt | llm | StrOutputParser()
+            result = chain.invoke(
+                {
+                    "task_description": task_description or "general data analysis",
+                    "keywords": ", ".join(keywords) if keywords else "",
+                    "table_info": table_info_str,
+                    "max_index": len(filtered_tables) - 1,
+                }
+            )
+        except Exception as llm_err:
+            print(f"LLM table selection unavailable, using heuristic: {llm_err}")
+            # Heuristic fallback: choose the most 'dense' table by size and numeric richness
+            
+            def score_fn(tbl: pd.DataFrame) -> float:
+                numeric_cols = len(tbl.select_dtypes(include=[np.number]).columns)
+                non_null = tbl.notna().sum().sum()
+                return non_null + (tbl.shape[0] * tbl.shape[1]) + (numeric_cols * 100)
 
-        # Get LLM model and create chain
-        llm = get_chat_model()
-        chain = prompt | llm | StrOutputParser()
-
-        # Invoke LLM with table data
-        result = chain.invoke(
-            {
-                "task_description": task_description or "general data analysis",
-                "keywords": ", ".join(keywords) if keywords else "",
-                "table_info": table_info_str,
-                "max_index": len(filtered_tables) - 1,
-            }
-        )
+            best_idx, _ = max(
+                [(original_idx, score_fn(table)) for original_idx, table in filtered_tables],
+                key=lambda x: x[1]
+            )
+            return best_idx
 
         # Parse LLM response to get table index
         try:
             selected_filtered_index = int(result.strip())
             if 0 <= selected_filtered_index < len(filtered_tables):
                 selected_original_index = original_indices[selected_filtered_index]
-                print(f"LLM selected filtered table {selected_filtered_index} (original table {selected_original_index}) for task: {task_description}")
+                print(
+                    "LLM selected filtered table "
+                    f"{selected_filtered_index} (original table {selected_original_index}) "
+                    f"for task: {task_description}"
+                )
                 return selected_original_index
             else:
-                raise ValueError(f"LLM returned invalid index {selected_filtered_index}, expected 0-{len(filtered_tables)-1}")
+                raise ValueError(
+                    f"LLM returned invalid index {selected_filtered_index}, expected 0-"
+                    f"{len(filtered_tables) - 1}"
+                )
         except (ValueError, AttributeError) as e:
             raise ValueError(f"Could not parse LLM response '{result}': {str(e)}")
 
     def _pre_filter_tables_for_llm(self, tables: List[pd.DataFrame], keywords: List[str] = None) -> List[tuple]:
         """
-        Pre-filter tables to reduce LLM token usage while maintaining quality
+        Pre - filter tables to reduce LLM token usage while maintaining quality
         Returns list of (original_index, table) tuples for promising tables
         """
         import re  # Import for pattern matching
         keywords = keywords or []
         keyword_set = set(word.lower() for word in keywords)
-        
+
         candidate_tables = []
-        
+
         for i, table in enumerate(tables):
             # Skip obviously unusable tables
             if table.shape[0] < 2 or table.shape[1] < 2:  # Too small
                 continue
-            if table.shape[0] > 1000:  # Probably too large/repetitive
+            if table.shape[0] > 1000:  # Probably too large / repetitive
                 continue
-                
+
             # Calculate content quality score
             score = 0
-            
+
             # Size factor (prefer substantial but not huge tables)
             row_score = min(table.shape[0] / 10, 10)  # Max 10 points for rows
             col_score = min(table.shape[1] * 2, 10)   # Max 10 points for columns
             score += row_score + col_score
-            
+
             # Content relevance (check column names and sample data)
             content_text = " ".join(str(col) for col in table.columns).lower()
             sample_text = " ".join(str(val) for val in table.iloc[:3].values.flatten() if pd.notna(val)).lower()
             all_text = content_text + " " + sample_text
-            
+
             # Keyword matching
             if keywords:
                 keyword_matches = sum(1 for word in keyword_set if word in all_text)
                 score += keyword_matches * 5  # 5 points per keyword match
-            
-            # Data density (prefer tables with actual data vs empty/sparse)
+
+            # Data density (prefer tables with actual data vs empty / sparse)
             non_null_ratio = table.notna().sum().sum() / (table.shape[0] * table.shape[1])
             score += non_null_ratio * 10
-            
+
             # Numeric data bonus (good for analysis)
             numeric_cols = len(table.select_dtypes(include=[np.number]).columns)
             score += numeric_cols * 2
-            
+
             # Avoid tables with too many identical values (formatting tables)
             if table.shape[0] > 5:
                 diversity_score = len(set(str(val) for val in table.iloc[:, 0] if pd.notna(val)))
                 if diversity_score / min(table.shape[0], 10) < 0.3:  # Less than 30% diversity
                     score -= 10  # Penalty for repetitive content
-            
-            # Special handling for revenue/financial data
+
+            # Special handling for revenue / financial data
             if keywords and any(word in ['gross', 'revenue', 'billion', 'money'] for word in keywords):
-                # Check for clean numeric data patterns in gross/revenue columns
+                # Check for clean numeric data patterns in gross / revenue columns
                 gross_cols = [col for col in table.columns if 'gross' in str(col).lower()]
                 if gross_cols:
                     sample_values = table[gross_cols[0]].astype(str).head(5).tolist()
                     # Prefer tables with clean numeric formats like "$2,923,706,026"
-                    clean_format_count = sum(1 for val in sample_values 
-                                           if re.match(r'^\$[\d,]+$', str(val)))
+                    clean_format_count = sum(
+                        1 for val in sample_values if re.match(r'^\$[\d,]+$', str(val))
+                    )
                     if clean_format_count >= 3:  # At least 3 clean format values
                         print(f"Table {i} has clean revenue format, boosting score")
                         score += 20  # Significant bonus for clean revenue data
-                    
-                    # Penalize tables with complex/messy formats
-                    messy_format_count = sum(1 for val in sample_values 
-                                           if ('–' in str(val) or '(' in str(val) or 'R' in str(val)))
+
+                    # Penalize tables with complex / messy formats
+                    messy_format_count = sum(
+                        1
+                        for val in sample_values
+                        if ('–' in str(val) or '(' in str(val) or 'R' in str(val))
+                    )
                     if messy_format_count >= 2:
                         print(f"Table {i} has messy revenue format, reducing score")
                         score -= 15  # Penalty for messy revenue data
-            
+
             candidate_tables.append((i, table, score))
-        
+
         # Sort by score and return top candidates
         candidate_tables.sort(key=lambda x: x[2], reverse=True)
-        
+
         # Take top candidates (more conservative limit before LLM selection)
         top_candidates = candidate_tables[:min(20, len(candidate_tables))]
-        print(f"Pre-filtering selected {len(top_candidates)} promising tables from {len(tables)} total")
-        
+        print(f"Pre - filtering selected {len(top_candidates)} promising tables from {len(tables)} total")
+
         return [(i, table) for i, table, score in top_candidates]
+
 
 class InspectTableStep:
     """
@@ -950,7 +997,7 @@ class InspectTableStep:
             data.columns = new_columns
             print(f"Flattened columns: {data.columns.tolist()}")
 
-        # LLM-powered header detection for generic web scraping
+        # LLM - powered header detection for generic web scraping
         task_description = input_data.get("task_description", "")
         keywords = extract_keywords(task_description)
         first_row_is_header, header_row_idx = self._detect_headers_with_llm(
@@ -1025,7 +1072,7 @@ class InspectTableStep:
                     print(f"LLM detected headers in row {header_row}")
                     return True, header_row
                 else:
-                    raise ValueError(f"LLM returned invalid row index: {result}, expected 0-{rows_to_check-1}")
+                    raise ValueError(f"LLM returned invalid row index: {result}, expected 0-{rows_to_check - 1}")
             except ValueError as e:
                 raise ValueError(f"Could not parse LLM response '{result}': {str(e)}")
 
@@ -1046,7 +1093,7 @@ class CleanDataStep:
 
         # Define columns that should NOT be converted to numeric
         text_columns = ['Title', 'Ref']  # Movie titles and references should stay as text
-        
+
         # Clean each column
         task_description = input_data.get("task_description", "")
         keywords = extract_keywords(task_description)
@@ -1054,16 +1101,16 @@ class CleanDataStep:
             # Skip columns that should remain as integers
             if col in ['Rank', 'Year']:
                 continue
-                
+
             # Skip text columns that should never be converted to numeric
             if col in text_columns:
                 print(f"\nSkipping text column: {col} (keeping as text)")
                 continue
-                
+
             if data[col].dtype == "object":
                 print(f"\nCleaning column: {col}")
                 # More robust cleaning by extracting the first valid number,
-                # rather than trying to strip all non-numeric characters.
+                # rather than trying to strip all non - numeric characters.
                 # This prevents concatenating numbers from footnotes or years.
                 s = data[col].astype(str)
 
@@ -1079,7 +1126,7 @@ class CleanDataStep:
 
                 # Convert to numeric
                 numeric_data = pd.to_numeric(cleaned, errors="coerce")
-                
+
                 # Additional outlier filtering for financial data
                 if 'gross' in col.lower() or 'revenue' in col.lower() or 'box' in col.lower():
                     # Cap at a reasonable maximum for movie revenues (e.g., 50B)
@@ -1140,7 +1187,7 @@ class AnalyzeDataStep:
             print("ERROR: No numeric columns found for analysis")
             return {"top_n_df": pd.DataFrame(), "analysis_col": None}
 
-        # LLM-powered column selection for analysis
+        # LLM - powered column selection for analysis
         task_description = input_data.get("task_description", "")
         keywords = extract_keywords(task_description)
         best_col = self._select_analysis_column_with_llm(
@@ -1153,7 +1200,7 @@ class AnalyzeDataStep:
 
         print(f"Selected column '{best_col}' for analysis")
 
-        # Clean and analyze - first filter out summary/total rows using LLM
+        # Clean and analyze - first filter out summary / total rows using LLM
         data_clean = data.dropna(subset=[best_col])
         data_clean = self._filter_summary_rows_with_llm(
             data_clean, input_data.get("task_description", "")
@@ -1262,7 +1309,7 @@ class AnalyzeDataStep:
             score = 0
             col_name = str(col).lower()
 
-            # Avoid summary/total/rank columns
+            # Avoid summary / total / rank columns
             if any(
                 keyword in col_name for keyword in ["world", "total", "sum", "rank", "position"]
             ):
@@ -1298,7 +1345,7 @@ class AnalyzeDataStep:
         self, data: pd.DataFrame, task_description: str = ""
     ) -> pd.DataFrame:
         """
-        Use LLM to identify and filter out summary/total rows
+        Use LLM to identify and filter out summary / total rows
         """
         try:
             from langchain.prompts import ChatPromptTemplate
@@ -1336,7 +1383,7 @@ class AnalyzeDataStep:
 
                 for row_value in rows_to_remove:
                     if row_value:  # Skip empty values
-                        # Case-insensitive filtering
+                        # Case - insensitive filtering
                         mask = (
                             ~data[name_col]
                             .astype(str)
@@ -1358,7 +1405,7 @@ class AnalyzeDataStep:
 
         except Exception as e:
             print(f"Error in LLM summary row filtering: {str(e)}, using fallback")
-            # Fallback to keyword-based approach
+            # Fallback to keyword - based approach
             if len(data) > 0:
                 text_cols = data.select_dtypes(include=["object"]).columns.tolist()
                 if text_cols:
@@ -1397,7 +1444,7 @@ class VisualizeStep:
     """
     Step 5: Enhanced generic visualization
     - Support multiple chart types (bar, scatter, histogram, time_series)
-    - Auto-detect visualization type based on task requirements
+    - Auto - detect visualization type based on task requirements
     - Use dynamic column names
     - Return base64 encoded images when requested
     - Handle various data relationships (rank vs peak, total vs deaths, etc.)
@@ -1444,7 +1491,7 @@ class VisualizeStep:
                 plt.ylabel(analysis_col)
 
             elif chart_type == "scatter":
-                # Enhanced scatter plot with auto-detection of x/y columns
+                # Enhanced scatter plot with auto - detection of x / y columns
                 numeric_cols = data_clean.select_dtypes(include=[np.number]).columns.tolist()
                 x_col, y_col = self._select_scatter_columns(
                     numeric_cols, analysis_col, task_description
@@ -1613,7 +1660,7 @@ class VisualizeStep:
 
             return {
                 "plot_path": "generated",
-                "plot_base64": f"data:image/png;base64,{plot_base64}",
+                "plot_base64": f"data:image / png;base64,{plot_base64}",
                 "chart_type": chart_type,
                 "image_size_bytes": len(plot_base64),
             }
@@ -1625,7 +1672,7 @@ class VisualizeStep:
     def _auto_detect_chart_type(
         self, task_description: str, data_clean, keywords: List[str] = None
     ) -> str:
-        """Auto-detect the appropriate chart type based on task description using LLM"""
+        """Auto - detect the appropriate chart type based on task description using LLM"""
         try:
             from langchain.prompts import ChatPromptTemplate
             from langchain.schema import StrOutputParser
@@ -1727,7 +1774,7 @@ class VisualizeStep:
             if runs_col and avg_col:
                 return runs_col, avg_col
 
-        # Default: use first two numeric columns, prioritizing analysis_col as y-axis
+        # Default: use first two numeric columns, prioritizing analysis_col as y - axis
         if len(numeric_cols) >= 2:
             if analysis_col in numeric_cols:
                 other_cols = [col for col in numeric_cols if col != analysis_col]
@@ -1738,7 +1785,7 @@ class VisualizeStep:
         return None, None
 
     def _find_date_columns(self, data_clean) -> List[str]:
-        """Find columns that might contain date/time information"""
+        """Find columns that might contain date / time information"""
         date_cols = []
         for col in data_clean.columns:
             col_lower = str(col).lower()
@@ -1780,7 +1827,7 @@ class AnswerQuestionsStep:
 
             # Enhanced question answering based on data structure and domain
 
-            # LLM-powered question interpretation and answering
+            # LLM - powered question interpretation and answering
             answers.update(
                 self._answer_questions_with_llm(
                     data_clean,
@@ -1834,13 +1881,13 @@ class AnswerQuestionsStep:
                             pass
                 answers["correlations"] = correlations
 
-        # Use generic LLM-based question answering for all data types
+        # Use generic LLM - based question answering for all data types
         llm_answers = self._answer_questions_with_llm(
             data_clean, top_n_df, analysis_col, name_col, task_description
         )
         answers.update(llm_answers)
 
-        # Time-based analysis if year column exists (generic approach)
+        # Time - based analysis if year column exists (generic approach)
         year_cols = [col for col in data_clean.columns if "year" in str(col).lower()]
         if year_cols:
             self._answer_temporal_questions(
@@ -1877,7 +1924,7 @@ class AnswerQuestionsStep:
             print("Including plot_base64 in answers as requested by task")
             answers["visualization"] = plot_base64
 
-        # Use LLM-based question answering for all tasks
+        # Use LLM - based question answering for all tasks
         llm_answers = self._answer_questions_with_llm(
             data_clean, top_n_df, analysis_col, name_col, task_description
         )
@@ -1922,7 +1969,7 @@ class AnswerQuestionsStep:
 
             # Get year column if exists for temporal questions
             year_cols = [col for col in data_clean.columns if "year" in str(col).lower()]
-            
+
             # Get all columns to help LLM understand the data structure
             all_columns = list(data_clean.columns)
 
@@ -1936,8 +1983,8 @@ class AnswerQuestionsStep:
                     for col in all_columns[:6]:  # Limit to first 6 columns to avoid overwhelming
                         try:
                             row_dict[col] = str(data_clean.iloc[i][col])
-                        except:
-                            row_dict[col] = "N/A"
+                        except Exception:
+                            row_dict[col] = "N / A"
                     sample_data.append(row_dict)
 
             # Prepare top N data for LLM with more context
@@ -1950,11 +1997,11 @@ class AnswerQuestionsStep:
                         try:
                             value = top_n_df.iloc[i][col]
                             if pd.isna(value):
-                                row_data[col] = "N/A"
+                                row_data[col] = "N / A"
                             else:
                                 row_data[col] = str(value)
-                        except:
-                            row_data[col] = "N/A"
+                        except Exception:
+                            row_data[col] = "N / A"
                     top_10_items.append(row_data)
             else:
                 top_10_items = []
@@ -1971,21 +2018,21 @@ class AnswerQuestionsStep:
 DATASET OVERVIEW:
 - Total rows: {data_insights['total_rows']}
 - Primary analysis column: {analysis_col}
-- Name/identifier column: {name_col}
+- Name / identifier column: {name_col}
 - All available columns: {', '.join(all_columns)}
 - Value range: {data_insights['min_value']:,.2f} to {data_insights['max_value']:,.2f}
 - Average value: {data_insights['average_value']:,.2f}
 
 SAMPLE DATA (first {len(sample_data)} rows):
-{chr(10).join([f"Row {i+1}: {row}" for i, row in enumerate(sample_data)])}
+{chr(10).join([f"Row {i + 1}: {row}" for i, row in enumerate(sample_data)])}
 
 TEMPORAL INFO:
 - Year columns found: {', '.join(year_cols) if year_cols else 'None detected'}
 - Numeric columns: {', '.join(numeric_cols)}
             """.strip()
-            
+
             chart_description_str = f"Scatter plot visualization of {analysis_col} data with regression line"
-            
+
             top_results_str = f"TOP {len(top_10_items)} RANKED ITEMS:\n" + "\n".join([
                 f"Rank {item['rank']}: " + ", ".join([f"{k}: {v}" for k, v in item.items() if k != 'rank'])
                 for item in top_10_items
@@ -2016,6 +2063,8 @@ TEMPORAL INFO:
                 print("LLM response not in JSON format, extracting key insights")
                 # Extract key insights from text response
                 insights = {}
+                # Use top_10_items (first 5) instead of undefined top_5_items
+                top_5_items = top_10_items[:5] if top_10_items else []
                 if "5th" in result.lower() and len(top_5_items) >= 5:
                     insights["llm_fifth_item_insight"] = top_5_items[4]["name"]
                 if "total" in result.lower():
@@ -2033,7 +2082,7 @@ TEMPORAL INFO:
             return {"llm_error": str(e)}
 
     def _is_financial_data(self, analysis_col: str, task_description: str) -> bool:
-        """Check if this is financial/revenue data"""
+        """Check if this is financial / revenue data"""
         financial_keywords = [
             "gross",
             "revenue",
@@ -2048,7 +2097,7 @@ TEMPORAL INFO:
         return any(keyword in col_lower or keyword in task_lower for keyword in financial_keywords)
 
     def _is_health_data(self, analysis_col: str, task_description: str) -> bool:
-        """Check if this is health/medical data"""
+        """Check if this is health / medical data"""
         health_keywords = [
             "cases",
             "deaths",
@@ -2118,7 +2167,7 @@ TEMPORAL INFO:
         name_col: str,
         task_description: str,
     ):
-        """Answer financial/revenue specific questions"""
+        """Answer financial / revenue specific questions"""
         if "billion" in str(analysis_col).lower() or "billion" in task_description.lower():
             # Count items above certain thresholds
             above_1_5bn = len(data_clean[data_clean[analysis_col] > 1500])
@@ -2136,7 +2185,7 @@ TEMPORAL INFO:
         name_col: str,
         top_n_df,
     ):
-        """Answer health/medical specific questions"""
+        """Answer health / medical specific questions"""
         # Look for death rate calculations
         numeric_cols = data_clean.select_dtypes(include=[np.number]).columns.tolist()
         deaths_col = None
@@ -2150,7 +2199,7 @@ TEMPORAL INFO:
                 cases_col = col
 
         if deaths_col and cases_col:
-            # Calculate death-to-case ratio
+            # Calculate death - to - case ratio
             data_clean["death_rate"] = (data_clean[deaths_col] / data_clean[cases_col] * 100).round(
                 2
             )
@@ -2160,7 +2209,7 @@ TEMPORAL INFO:
             answers["highest_death_rate_country"] = highest_death_rate_country
             answers["highest_death_rate_value"] = highest_death_rate_value
             print(
-                f"Highest death-to-case ratio: {highest_death_rate_country} ({highest_death_rate_value:.2f}%)"
+                f"Highest death - to - case ratio: {highest_death_rate_country} ({highest_death_rate_value:.2f}%)"
             )
 
             # Global average calculations
@@ -2235,7 +2284,7 @@ TEMPORAL INFO:
         name_col: str,
         top_n_df,
     ):
-        """Answer entertainment/rating specific questions"""
+        """Answer entertainment / rating specific questions"""
         if "rating" in str(analysis_col).lower():
             avg_rating = data_clean[analysis_col].mean()
             answers["average_rating"] = avg_rating
@@ -2261,7 +2310,7 @@ TEMPORAL INFO:
         name_col: str,
         year_col: str,
     ):
-        """Answer time-based questions"""
+        """Answer time - based questions"""
         try:
             # Ensure year column is numeric
             data_clean[year_col] = pd.to_numeric(data_clean[year_col], errors="coerce")
@@ -2301,7 +2350,7 @@ TEMPORAL INFO:
             return "general"
 
     def _identify_domain(self, task_description: str) -> str:
-        """Identify the domain/industry of the data using LLM-based classification"""
+        """Identify the domain / industry of the data using LLM - based classification"""
         try:
             from langchain.prompts import ChatPromptTemplate
             from langchain.schema import StrOutputParser
@@ -2348,7 +2397,7 @@ Respond with only the domain name."""
 
         except Exception as e:
             logger.warning(f"LLM domain classification failed: {e}")
-            # Fallback to keyword-based classification
+            # Fallback to keyword - based classification
             return self._identify_domain_fallback(task_description)
 
     def _identify_domain_fallback(self, task_description: str) -> str:

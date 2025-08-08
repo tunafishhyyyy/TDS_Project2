@@ -14,8 +14,6 @@ from langchain.prompts import ChatPromptTemplate
 from utils.prompts import (
     EDA_SYSTEM_PROMPT,
     EDA_HUMAN_PROMPT,
-    DATA_ANALYSIS_SYSTEM_PROMPT,
-    DATA_ANALYSIS_HUMAN_PROMPT,
     IMAGE_ANALYSIS_SYSTEM_PROMPT,
     IMAGE_ANALYSIS_HUMAN_PROMPT,
     CODE_WORKFLOW_SYSTEM_PROMPT,
@@ -47,8 +45,6 @@ from .web_scraping_steps import (
 # Import new generalized workflow components
 from .generalized_workflow import (
     DataAnalysisWorkflow as GeneralizedDataAnalysisWorkflow,
-    ComposableWorkflowBuilder,
-    create_data_analysis_workflow,
 )
 
 logger = logging.getLogger(__name__)
@@ -95,7 +91,7 @@ class ExploratoryDataAnalysisWorkflow(BaseWorkflow):
             }
 
     def _create_eda_prompt(self) -> ChatPromptTemplate:
-        """Create EDA-specific prompt"""
+        """Create EDA - specific prompt"""
         return ChatPromptTemplate.from_messages(
             [
                 ("system", EDA_SYSTEM_PROMPT),
@@ -120,7 +116,7 @@ class DataAnalysisWorkflow(BaseWorkflow):
         try:
             # Delegate to the new generalized workflow
             result = await self.generalized_workflow.execute(input_data)
-            
+
             # Transform result to maintain backward compatibility
             return {
                 "analysis_result": result.get('formatted_output', {}).get('report', str(result)),
@@ -222,12 +218,11 @@ class CodeGenerationWorkflow(BaseWorkflow):
     def _clean_generated_code(self, code: str) -> str:
         """Clean generated code by removing markdown formatting"""
         # Remove markdown code blocks
-        import re
 
         # Remove ```python and ``` markers
         code = re.sub(r"```python\n?", "", code)
         code = re.sub(r"```\n?", "", code)
-        # Remove any leading/trailing whitespace
+        # Remove any leading / trailing whitespace
         return code.strip()
 
     def _validate_python_syntax(self, code: str) -> Dict[str, Any]:
@@ -268,7 +263,6 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from datetime import datetime
 import json
 
 # Create sample data if needed
@@ -392,7 +386,7 @@ class DataVisualizationWorkflow(BaseWorkflow):
                 variables=json.dumps(input_data.get("variables", []), indent=2),
                 analysis_goals=input_data.get("analysis_goals", ""),
                 target_audience=input_data.get("target_audience", "technical team"),
-                platform=input_data.get("platform", "Python (matplotlib/seaborn)"),
+                platform=input_data.get("platform", "Python (matplotlib / seaborn)"),
             )
 
             return {
@@ -545,7 +539,7 @@ class StatisticalAnalysisWorkflow(BaseWorkflow):
 
 
 class MultiStepWebScrapingWorkflow(BaseWorkflow):
-    """Enhanced workflow for multi-step web scraping tasks with actual execution"""
+    """Enhanced workflow for multi - step web scraping tasks with actual execution"""
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -553,16 +547,16 @@ class MultiStepWebScrapingWorkflow(BaseWorkflow):
         self.chain = LLMChain(llm=self.llm, prompt=self.prompt_template)
 
     def _create_multi_step_prompt(self) -> ChatPromptTemplate:
-        """Create multi-step web scraping prompt"""
+        """Create multi - step web scraping prompt"""
         return ChatPromptTemplate.from_messages([
             ("system", MULTI_STEP_SYSTEM_PROMPT),
             ("human", MULTI_STEP_HUMAN_PROMPT)
         ])
 
     async def execute(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute multi-step web scraping workflow with actual execution"""
+        """Execute multi - step web scraping workflow with actual execution"""
         try:
-            logger.info(f"Starting multi-step web scraping workflow")
+            logger.info(f"Starting multi - step web scraping workflow")
 
             # Extract URL from task description
             task_description = input_data.get("task_description", "")
@@ -582,7 +576,7 @@ class MultiStepWebScrapingWorkflow(BaseWorkflow):
             # Execute the generated code
             execution_result = await self._execute_generated_code(result, input_data)
 
-            logger.info(f"Multi-step web scraping workflow completed successfully")
+            logger.info(f"Multi - step web scraping workflow completed successfully")
 
             return {
                 "scraping_plan": result,
@@ -601,7 +595,7 @@ class MultiStepWebScrapingWorkflow(BaseWorkflow):
             }
 
         except Exception as e:
-            logger.error(f"Error in multi-step web scraping workflow: {e}")
+            logger.error(f"Error in multi - step web scraping workflow: {e}")
             return {
                 "error": str(e),
                 "workflow_type": "multi_step_web_scraping",
@@ -611,7 +605,6 @@ class MultiStepWebScrapingWorkflow(BaseWorkflow):
 
     def _extract_url_from_task(self, task_description: str) -> str:
         """Extract URL from task description"""
-        import re
 
         url_pattern = r"https?://[^\s]+"
         urls = re.findall(url_pattern, task_description)
@@ -647,7 +640,6 @@ class MultiStepWebScrapingWorkflow(BaseWorkflow):
 
     def _extract_code_blocks(self, text: str) -> List[str]:
         """Extract Python code blocks from text"""
-        import re
 
         code_pattern = r"```python\s*\n(.*?)\n```"
         matches = re.findall(code_pattern, text, re.DOTALL)
@@ -720,7 +712,7 @@ class MultiStepWebScrapingWorkflow(BaseWorkflow):
                             f"DataFrame shape: {var_value.shape}, columns: {list(var_value.columns)}"
                         )
                     elif hasattr(var_value, "__len__") and len(var_value) > 0:
-                        output_vars[var_name] = f"List/Array with {len(var_value)} items: {str(var_value)[:200]}..."
+                        output_vars[var_name] = f"List / Array with {len(var_value)} items: {str(var_value)[:200]}..."
                     else:
                         output_vars[var_name] = str(var_value)
 
@@ -769,7 +761,7 @@ class MultiStepWebScrapingWorkflow(BaseWorkflow):
 
 
 class ModularWebScrapingWorkflow(BaseWorkflow):
-    """Fallback workflow using modular step-based approach when LLM is not available"""
+    """Fallback workflow using modular step - based approach when LLM is not available"""
 
     def __init__(self, **kwargs):
         # Don't call super().__init__ since we don't need LLM for this approach
@@ -812,7 +804,7 @@ class ModularWebScrapingWorkflow(BaseWorkflow):
                     "timestamp": datetime.now().isoformat(),
                 }
 
-            # Execute the step-based workflow
+            # Execute the step - based workflow
             execution_log = []
             data = {"task_description": task_description}  # Pass task description to all steps
 
@@ -850,7 +842,7 @@ class ModularWebScrapingWorkflow(BaseWorkflow):
                 data.update(step4_result)
                 execution_log.append("✓ Data analysis completed")
 
-                # Step 5: Visualize (auto-detect chart type from task)
+                # Step 5: Visualize (auto - detect chart type from task)
                 step5 = VisualizeStep()
                 step5_input = {**data, "return_base64": True}
                 step5_result = step5.run(step5_input)
@@ -874,7 +866,7 @@ class ModularWebScrapingWorkflow(BaseWorkflow):
                     "plot_base64": data.get("plot_base64"),
                     "chart_type": data.get("chart_type"),
                     "image_size_bytes": data.get("image_size_bytes"),
-                    "message": "Workflow completed using step-based approach",
+                    "message": "Workflow completed using step - based approach",
                     "fallback_mode": True,
                 }
 
@@ -900,7 +892,6 @@ class ModularWebScrapingWorkflow(BaseWorkflow):
 
     def _extract_url_from_task(self, task_description: str) -> str:
         """Extract URL from task description"""
-        import re
 
         url_pattern = r"https?://[^\s]+"
         urls = re.findall(url_pattern, task_description)
@@ -908,7 +899,7 @@ class ModularWebScrapingWorkflow(BaseWorkflow):
 
 
 class AdvancedWorkflowOrchestrator(WorkflowOrchestrator):
-    """Enhanced orchestrator with domain-specific workflows"""
+    """Enhanced orchestrator with domain - specific workflows"""
 
     def __init__(self):
         super().__init__()
@@ -925,14 +916,16 @@ class AdvancedWorkflowOrchestrator(WorkflowOrchestrator):
                 logger.info("LLM initialized successfully using Gemini as a fallback.")
             else:
                 # If no key is available, we cannot proceed with this orchestrator
-                raise ValueError("No OpenAI or Gemini API key found. Cannot initialize LLM for AdvancedWorkflowOrchestrator.")
+                raise ValueError(
+                    "No OpenAI or Gemini API key found. Cannot initialize LLM for AdvancedWorkflowOrchestrator."
+                )
 
         except Exception as e:
             logger.error(f"Critical error initializing LLM for AdvancedWorkflowOrchestrator: {e}")
-            # Re-raise the exception to be caught by the main application logic
+            # Re - raise the exception to be caught by the main application logic
             raise e
 
-        # Add specialized workflows including multi-modal support
+        # Add specialized workflows including multi - modal support
         # Only initialize workflows that require LLM if LLM is available
         self.workflows.update(
             {
@@ -1025,7 +1018,7 @@ class AdvancedWorkflowOrchestrator(WorkflowOrchestrator):
             "available_workflows": list(self.workflows.keys()),
             "workflow_descriptions": {
                 "data_analysis": "General data analysis and recommendations",
-                "image_analysis": "Image processing, computer vision, and image-based analysis",
+                "image_analysis": "Image processing, computer vision, and image - based analysis",
                 "text_analysis": "Natural language processing and text analytics",
                 "code_generation": "Generate Python code for data analysis tasks",
                 "exploratory_data_analysis": "Comprehensive EDA planning and execution",
@@ -1040,13 +1033,13 @@ class AdvancedWorkflowOrchestrator(WorkflowOrchestrator):
                 "Memory management across conversations",
                 "Error handling and recovery",
                 "Execution history tracking",
-                "Flexible input/output formats",
+                "Flexible input / output formats",
                 "Integration with multiple LLM providers",
                 "Statistical analysis and visualization",
-                "Multi-modal analysis (text, image, code)",
+                "Multi - modal analysis (text, image, code)",
                 "Synchronous processing",
                 "Multiple file upload support",
-                "LLM-based workflow detection",
+                "LLM - based workflow detection",
             ],
         }
 
@@ -1064,28 +1057,17 @@ STEP_REGISTRY = {
 
 
 # --- Orchestrator (usage example) ---
-def run_web_scraping_workflow(url: str, top_n: int = 10) -> dict:
-    """
-    Example usage of the new web scraping step classes in a workflow.
-    """
-    # Step plan (could be generated by LLM)
-    plan = [
-        {"step": "scrape_table", "url": url},
-        {"step": "inspect_table"},
-        {"step": "clean_data"},
-        {"step": "analyze_data", "top_n": top_n},
-        {"step": "visualize"},
-        {"step": "answer"},
-    ]
-    data = {}
-    for step_cfg in plan:
-        step_name = step_cfg["step"]
-        params = {k: v for k, v in step_cfg.items() if k != "step"}
-        step_cls = STEP_REGISTRY[step_name]
-        step = step_cls()
-        step_input = {**data, **params}
-        data = step.run(step_input)
-    return data
+# --- Step Registry for dynamic step loading ---
+# This allows dynamic loading of steps by name
+STEP_REGISTRY: Dict[str, Any] = {
+    "detect_format": DetectDataFormatStep,
+    "scrape_table": ScrapeTableStep,
+    "inspect_table": InspectTableStep,
+    "clean_data": CleanDataStep,
+    "analyze_data": AnalyzeDataStep,
+    "visualize": VisualizeStep,
+    "answer": AnswerQuestionsStep,
+}
 
 
 def detect_steps_from_prompt(user_request: str, llm=None) -> list:
@@ -1097,7 +1079,6 @@ def detect_steps_from_prompt(user_request: str, llm=None) -> list:
     if llm is not None:
         response = llm(prompt)
         import json
-        import re
 
         try:
             plan = json.loads(response)
@@ -1110,7 +1091,7 @@ def detect_steps_from_prompt(user_request: str, llm=None) -> list:
     else:
         # Fallback: simple hardcoded plan for demo
         return [
-            {"step": "scrape_table", "url": "https://en.wikipedia.org/wiki/List_of_countries_by_GDP_(nominal)"},
+            {"step": "scrape_table", "url": "https://en.wikipedia.org / wiki / List_of_countries_by_GDP_(nominal)"},
             {"step": "inspect_table"},
             {"step": "clean_data"},
             {"step": "analyze_data", "top_n": 10},
@@ -1142,7 +1123,7 @@ def run_llm_planned_workflow(user_request: str, llm=None) -> dict:
 # --- Usage Example ---
 # Suppose you want to run the workflow for the content of questions.txt:
 #
-# with open('Project2/questions.txt', 'r') as f:
+# with open('Project2 / questions.txt', 'r') as f:
 #     user_request = f.read()
 # result = run_llm_planned_workflow(user_request, llm=my_llm)
 # print(result)

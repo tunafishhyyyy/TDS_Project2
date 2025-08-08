@@ -14,15 +14,15 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")  # Added for Gemini
 LANGCHAIN_TRACING_V2 = os.getenv("LANGCHAIN_TRACING_V2", "false")
 LANGCHAIN_API_KEY = os.getenv("LANGCHAIN_API_KEY")
 
-# Model Configuration
-DEFAULT_OPENAI_MODEL = "gpt-4"  # Upgraded to GPT-4 for better accuracy
-DEFAULT_GEMINI_MODEL = "gemini-pro"
+# Model Configuration (use valid model IDs; allow override via env)
+DEFAULT_OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+DEFAULT_GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
 TEMPERATURE = 0.3  # Lower temperature for more accurate analysis
 MAX_TOKENS = 4000
 
 # Vector Store Configuration
 VECTOR_STORE_TYPE = "chromadb"  # Options: chromadb, faiss
-EMBEDDING_MODEL = "text-embedding-ada-002"  # Reverted for stability
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
 
 # Chain Configuration
 CHAIN_TIMEOUT = 120  # seconds
@@ -35,6 +35,8 @@ def get_chat_model(provider="openai"):
     :param provider: 'openai' or 'gemini'
     """
     if provider == "openai":
+        if not OPENAI_API_KEY:
+            raise ValueError("OPENAI_API_KEY not set; LLM is not configured")
         try:
             from langchain.chat_models import ChatOpenAI
             return ChatOpenAI(
@@ -56,6 +58,8 @@ def get_chat_model(provider="openai"):
             except ImportError:
                 raise ImportError("Could not import ChatOpenAI from langchain or langchain_openai")
     elif provider == "gemini":
+        if not GEMINI_API_KEY:
+            raise ValueError("GEMINI_API_KEY not set; LLM is not configured")
         try:
             from langchain_google_genai import ChatGoogleGenerativeAI
             return ChatGoogleGenerativeAI(

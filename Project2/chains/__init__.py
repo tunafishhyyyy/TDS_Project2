@@ -12,7 +12,7 @@ Available workflows:
 
 Usage:
     from chains.workflows import AdvancedWorkflowOrchestrator
-    
+
     orchestrator = AdvancedWorkflowOrchestrator()
     result = await orchestrator.execute_workflow("data_analysis", input_data)
 """
@@ -36,12 +36,12 @@ from .workflows import (
 
 __all__ = [
     "BaseWorkflow",
-    "DataAnalysisChain", 
+    "DataAnalysisChain",
     "CodeGenerationChain",
     "ReportGenerationChain",
     "WorkflowOrchestrator",
     "ExploratoryDataAnalysisWorkflow",
-    "PredictiveModelingWorkflow", 
+    "PredictiveModelingWorkflow",
     "DataVisualizationWorkflow",
     "AdvancedWorkflowOrchestrator",
     "MultiStepWebScrapingWorkflow",

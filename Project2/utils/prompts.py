@@ -1,6 +1,6 @@
 # Code Generation Prompt
 CODE_GENERATION_PROMPT = """You are a Python data analysis expert.
-Generate clean, well-documented Python code based on the following requirements:
+Generate clean, well - documented Python code based on the following requirements:
 
 Task: {task_description}
 Data Context: {data_context}
@@ -10,7 +10,7 @@ Output format: {output_format}
 Requirements:
 0. Use `requests.get` with appropriate headers to fetch HTML content before parsing.
 1. Use pandas for data manipulation
-2. Use matplotlib/seaborn for visualizations
+2. Use matplotlib / seaborn for visualizations
 3. Include error handling
 4. Add comments explaining each step
 5. Make code modular and reusable
@@ -56,7 +56,7 @@ Your task is to identify:
 
 Consider these indicators:
 - HTML <table> tags suggest html_tables format
-- <script> tags with JSON/data suggest javascript_data format
+- <script> tags with JSON / data suggest javascript_data format
 - Structured <div> patterns suggest structured_divs format
 - Multiple formats may coexist (mixed)
 
@@ -66,9 +66,9 @@ Respond in this JSON format:
   "strategy": "pandas_read_html|json_parsing|regex_extraction|custom_parsing",
   "confidence": "high|medium|low",
   "reasoning": "brief explanation",
-  "json_selectors": ["script[type='application/ld+json']",
+  "json_selectors": ["script[type='application / ld + json']",
                      "script containing data"],
-  "table_selectors": ["table.chart", "table.data-table"],
+  "table_selectors": ["table.chart", "table.data - table"],
   "fallback_strategy": "alternative approach if primary fails"
 }}"""
 
@@ -85,7 +85,7 @@ JSON_TO_DATAFRAME_SYSTEM_PROMPT = """You are a data extraction expert. Analyze t
 instructions for converting it to a tabular DataFrame.
 
 Identify:
-1. The path to the array/list containing the main data
+1. The path to the array / list containing the main data
 2. The key fields that should become DataFrame columns
 3. Any nested structures that need flattening
 
@@ -109,7 +109,7 @@ JAVASCRIPT_EXTRACTION_SYSTEM_PROMPT = """You are a JavaScript data extraction ex
 data relevant to the task.
 
 Look for:
-1. Variable assignments with arrays/objects
+1. Variable assignments with arrays / objects
 2. JSON data embedded in JavaScript
 3. API responses or data initialization
 4. Structured data patterns
@@ -125,7 +125,7 @@ Extract the JavaScript code containing the relevant data for this task."""
 
 # Div Data Extraction Prompts
 DIV_EXTRACTION_SYSTEM_PROMPT = """You are a web scraping expert specializing in extracting tabular data from
-div-based layouts.
+div - based layouts.
 
 Analyze the HTML structure and identify which container holds the relevant data. Then provide extraction instructions.
 
@@ -159,10 +159,10 @@ Selection criteria (in order of importance):
 
 AVOID:
 - Navigation tables (menus, links)
-- Summary/total tables (single rows with totals)
-- Reference/citation tables 
+- Summary / total tables (single rows with totals)
+- Reference / citation tables
 - Tables with mostly empty cells
-- Formatting/layout tables
+- Formatting / layout tables
 
 Respond with ONLY the table index number (0, 1, 2, etc.) of the PRIMARY data table."""
 
@@ -186,7 +186,7 @@ Your task: Determine if any of the first few data rows contains column headers t
 
 HEADER IDENTIFICATION CRITERIA:
 1. **Descriptive names**: Row contains descriptive text like "Rank", "Film", "Year", "Gross" rather than data values
-2. **Data type mismatch**: Row has text values in what appear to be numeric columns  
+2. **Data type mismatch**: Row has text values in what appear to be numeric columns
 3. **Pattern consistency**: Values look like column names throughout the row
 4. **Context relevance**: Header names match the analysis context
 
@@ -227,7 +227,7 @@ Analyze the task description and classify it into one of these workflow types:
 - predictive_modeling: Machine learning model development
 - data_visualization: Creating charts, graphs, visualizations
 - web_scraping: Extract data from websites
-- multi_step_web_scraping: Multi-step web scraping with analysis
+- multi_step_web_scraping: Multi - step web scraping with analysis
 - database_analysis: SQL analysis using databases
 - statistical_analysis: Statistical analysis, correlation, regression
 - text_analysis: Natural language processing and text analytics
@@ -244,9 +244,9 @@ COLUMN_SELECTION_SYSTEM_PROMPT = """You are an expert data analyst. Given numeri
 select the most relevant column for analysis.
 
 Avoid columns that are:
-- Summary/total columns (containing "total", "sum", "world", etc.)
-- Year columns (4-digit numbers starting with 19xx or 20xx)
-- Rank/position columns (containing "rank", "position")
+- Summary / total columns (containing "total", "sum", "world", etc.)
+- Year columns (4 - digit numbers starting with 19xx or 20xx)
+- Rank / position columns (containing "rank", "position")
 - Index columns
 
 Prefer columns with:
@@ -257,7 +257,7 @@ Prefer columns with:
 Respond with ONLY the exact column name."""
 
 COLUMN_SELECTION_HUMAN_PROMPT = """Task: {task_description}
-Keywords/entities: {keywords}
+Keywords / entities: {keywords}
 
 Available numeric columns:
 {column_descriptions}
@@ -266,15 +266,15 @@ Which column is most relevant for this analysis? Respond with just the column na
 
 # Summary Row Filtering Prompts
 SUMMARY_ROW_FILTERING_SYSTEM_PROMPT = """You are a data cleaning expert. Examine the data rows and identify
-which rows are summary/total rows that should be filtered out for analysis.
+which rows are summary / total rows that should be filtered out for analysis.
 
 Look for rows containing:
 - "Total", "Sum", "World", "All", "Overall"
-- Country/region aggregates in location data
+- Country / region aggregates in location data
 - Summary statistics
 - Rows with unusually high values that represent totals
 
-Respond with a JSON array of row indices (0-based) to remove:
+Respond with a JSON array of row indices (0 - based) to remove:
 ["row_index1", "row_index2", ...]
 
 If no summary rows are found, respond with an empty array: []"""
@@ -284,7 +284,7 @@ SUMMARY_ROW_FILTERING_HUMAN_PROMPT = """Task: {task_description}
 Data sample (showing identifier and analysis columns):
 {data_sample}
 
-Which row indices contain summary/total data that should be filtered out?
+Which row indices contain summary / total data that should be filtered out?
 Respond with JSON array of indices to remove: ["row_index1", "row_index2", ...]"""
 
 # ===== CHART TYPE DETECTION PROMPTS =====
@@ -299,7 +299,7 @@ Data characteristics:
 - Data shape: {data_shape}
 Keywords: {keywords}
 
-Which chart type (bar/scatter/histogram/time_series) is most appropriate and why?"""
+Which chart type (bar / scatter / histogram / time_series) is most appropriate and why?"""
 
 # ===== QUESTION ANSWERING PROMPTS =====
 QUESTION_ANSWERING_SYSTEM_PROMPT = """You are an expert data analyst providing insights based on processed data
@@ -316,7 +316,7 @@ CRITICAL INSTRUCTIONS:
 7. If data seems inconsistent in the results, note this in your response
 8. Base all answers on the PROCESSED ANALYSIS RESULTS provided to you
 
-RESPONSE FORMAT: Valid JSON with clear question-answer mapping.
+RESPONSE FORMAT: Valid JSON with clear question - answer mapping.
 ACCURACY IS PARAMOUNT - Use the processed data insights provided."""
 
 QUESTION_ANSWERING_HUMAN_PROMPT = """Task: {task_description}
@@ -326,7 +326,7 @@ IMPORTANT: The following is REAL DATA from the analysis. Use this data to answer
 Data Analysis Results:
 {data_insights}
 
-Chart/Visualization: {chart_description}
+Chart / Visualization: {chart_description}
 
 Top Results (VERIFY against this data):
 {top_results}
@@ -334,7 +334,7 @@ Top Results (VERIFY against this data):
 INSTRUCTIONS:
 1. Examine the sample data rows carefully
 2. Look for year information in the data
-3. Cross-reference rankings and values
+3. Cross - reference rankings and values
 4. Answer each question based on the ACTUAL DATA provided
 5. If you cannot find sufficient data to answer a question accurately, state so
 
@@ -342,7 +342,7 @@ Please provide accurate answers in JSON format, showing your reasoning based on 
 
 # Code Generation Prompt
 CODE_GENERATION_PROMPT = """You are a Python data analysis expert.
-Generate clean, well-documented Python code based on the following requirements:
+Generate clean, well - documented Python code based on the following requirements:
 
 Task: {task_description}
 Data Context: {data_context}
@@ -351,7 +351,7 @@ Output format: {output_format}
 
 Requirements:
 1. Use pandas for data manipulation
-2. Use matplotlib/seaborn for visualizations
+2. Use matplotlib / seaborn for visualizations
 3. Include error handling
 4. Add comments explaining each step
 5. Make code modular and reusable
@@ -384,7 +384,7 @@ QUESTION_ANSWERING_HUMAN_PROMPT = """Task: {task_description}
 Data Analysis Results:
 {data_insights}
 
-Chart/Visualization: {chart_description}
+Chart / Visualization: {chart_description}
 
 Top Results:
 {top_results}
@@ -435,8 +435,8 @@ IMAGE_ANALYSIS_SYSTEM_PROMPT = "You are an expert in image analysis. Analyze the
     "the questions."
 IMAGE_ANALYSIS_HUMAN_PROMPT = "Questions: {questions}\nImage: {image_file}"
 
-# Multi-step Web Scraping Prompts
-MULTI_STEP_SYSTEM_PROMPT = """You are a web scraping expert specializing in multi-step data analysis tasks.
+# Multi - step Web Scraping Prompts
+MULTI_STEP_SYSTEM_PROMPT = """You are a web scraping expert specializing in multi - step data analysis tasks.
 Your task is to execute complete web scraping workflows including:
 1. Web scraping and data extraction from any website
 2. Data cleaning and preprocessing (handling various data formats)
@@ -451,7 +451,7 @@ IMPORTANT:
 - Include proper error handling for different scenarios
 """
 
-MULTI_STEP_HUMAN_PROMPT = """Multi-Step Task: {task_description}
+MULTI_STEP_HUMAN_PROMPT = """Multi - Step Task: {task_description}
 Target URL: {url}
 Data Requirements: {data_requirements}
 Output Format: {output_format}
@@ -469,7 +469,7 @@ IMPORTANT:
 - Generate executable Python code that actually performs these tasks, not just a plan
 - Use pandas read_html() for web scraping when possible (it's more reliable)
 - ALWAYS inspect the actual data structure first (print column names, data types, first few rows)
-- Handle dynamic column names - NEVER assume specific column names like 'Country/Territory' exist
+- Handle dynamic column names - NEVER assume specific column names like 'Country / Territory' exist
 - Use data.columns[0] for the first column, data.columns[1] for second, etc.
 - Make the code generic enough to work with different types of data (not just GDP data)
 - Include all necessary imports and error handling
@@ -526,7 +526,7 @@ Consider:
 2. Data characteristics and quality
 3. Model selection and evaluation metrics
 4. Feature engineering requirements
-5. Cross-validation strategy
+5. Cross - validation strategy
 6. Model interpretability needs
 7. Production deployment considerations
 """
@@ -542,12 +542,12 @@ Provide a comprehensive modeling approach including:
 2. Recommended algorithms
 3. Feature engineering strategy
 4. Model evaluation approach
-5. Cross-validation strategy
+5. Cross - validation strategy
 6. Performance metrics
 7. Implementation roadmap
 8. Potential challenges and mitigation strategies
 
-Include Python code examples using scikit-learn and other relevant libraries.
+Include Python code examples using scikit - learn and other relevant libraries.
 """
 
 # Data Visualization Prompts
@@ -568,7 +568,7 @@ DATA_VISUALIZATION_HUMAN_PROMPT = """Data Description: {data_description}
 Variables: {variables}
 Analysis Goals: {analysis_goals}
 Target Audience: {target_audience}
-Platform/Tools: {platform}
+Platform / Tools: {platform}
 
 Recommend appropriate visualizations including:
 1. Chart types for each analysis goal
@@ -587,7 +587,7 @@ Your task is to provide Python code and analysis for web scraping tasks.
 
 Focus on:
 1. URL analysis and data structure identification
-2. HTML parsing strategies using BeautifulSoup/Selenium
+2. HTML parsing strategies using BeautifulSoup / Selenium
 3. Data cleaning and transformation
 4. Handling pagination and dynamic content
 5. Error handling and rate limiting
@@ -617,7 +617,7 @@ Your task is to provide SQL code and analysis strategies for complex datasets.
 
 Focus on:
 1. SQL query optimization for large datasets
-2. DuckDB-specific features and functions
+2. DuckDB - specific features and functions
 3. Data aggregation and statistical analysis
 4. Performance optimization strategies
 5. Cloud storage integration (S3, etc.)
@@ -625,7 +625,7 @@ Focus on:
 """
 
 DATABASE_ANALYSIS_HUMAN_PROMPT = """Analysis Task: {task_description}
-Database/Dataset: {database_info}
+Database / Dataset: {database_info}
 Data Schema: {schema_info}
 Analysis Goals: {analysis_goals}
 Performance Requirements: {performance_requirements}
@@ -644,7 +644,7 @@ Use DuckDB syntax and best practices for cloud data access.
 # Workflow Step Detection Prompt
 DETECT_STEPS_PROMPT = '''
 You are an expert workflow planner for data analysis and web scraping tasks.
-Given a user request, break it down into a sequence of high-level, reusable steps.
+Given a user request, break it down into a sequence of high - level, reusable steps.
 Each step should have a type (e.g., scrape_table, inspect_table, clean_data,
 analyze_data, visualize, answer)
 and relevant parameters.
@@ -656,7 +656,7 @@ User Request:
 
 Output Format Example:
 [
-  {"step": "scrape_table", "url": "https://example.com/table"},
+  {"step": "scrape_table", "url": "https://example.com / table"},
   {"step": "inspect_table"},
   {"step": "clean_data"},
   {"step": "analyze_data", "top_n": 10},
