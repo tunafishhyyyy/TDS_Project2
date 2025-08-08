@@ -1062,128 +1062,38 @@ class CleanDataStep:
                 
             if data[col].dtype == "object":
                 print(f"\nCleaning column: {col}")
-                # Convert to string first
-                cleaned = data[col].astype(str)
+                # More robust cleaning by extracting the first valid number,
+                # rather than trying to strip all non-numeric characters.
+                # This prevents concatenating numbers from footnotes or years.
+                s = data[col].astype(str)
 
-                # LLM-guided cleaning (inject keywords/entities)
-                # Could be enhanced to call LLM for cleaning strategy
-                # Remove common symbols and formatting (generic for various data types)
-                cleaned = cleaned.str.replace("$", "", regex=False)  # Currency
-                cleaned = cleaned.str.replace(",", "", regex=False)  # Thousands separator
-                cleaned = cleaned.str.replace("€", "", regex=False)  # Euro
-                cleaned = cleaned.str.replace("£", "", regex=False)  # Pound
-                cleaned = cleaned.str.replace("¥", "", regex=False)  # Yen
-                cleaned = cleaned.str.replace("%", "", regex=False)  # Percentage
-                cleaned = cleaned.str.replace("₹", "", regex=False)  # Rupee
-                cleaned = cleaned.str.replace("billion", "", regex=False)  # Scale indicators
-                cleaned = cleaned.str.replace("million", "", regex=False)
-                cleaned = cleaned.str.replace("trillion", "", regex=False)
-                cleaned = cleaned.str.replace("bn", "", regex=False)
-                cleaned = cleaned.str.replace("mn", "", regex=False)
-                # Add more currency and number formats
-                cleaned = cleaned.str.replace("B", "", regex=False)  # Billion abbreviation
-                cleaned = cleaned.str.replace("M", "", regex=False)  # Million abbreviation
-                cleaned = cleaned.str.replace("K", "", regex=False)  # Thousand abbreviation
+                # 1. Extract the primary numerical value.
+                # This pattern looks for a number (potentially with commas)
+                # and stops at the first character that isn't a digit or comma.
+                # It correctly handles "$2,923,706,026[# 1]" -> "2,923,706,026"
+                pat = r'^\D*([\d,]+(?:\.\d+)?)'
+                cleaned = s.str.extract(pat, expand=False)
 
-                # Enhanced cleaning for Wikipedia-style data
-                # First handle complex ranges and multiple values
-                
-                # Handle ranges like "$50,000,000–100,000,000" - take the lower value to avoid concatenation
-                range_pattern = r'(\d+(?:,\d{3})*(?:\.\d+)?)[–\-]+(\d+(?:,\d{3})*(?:\.\d+)?)'
-                import re
-                def extract_range_safe(text):
-                    matches = re.findall(range_pattern, str(text))
-                    if matches:
-                        # Take the LOWER value to avoid unrealistic concatenated numbers
-                        values = []
-                        for match in matches:
-                            try:
-                                val1 = float(match[0].replace(',', ''))
-                                val2 = float(match[1].replace(',', ''))
-                                values.extend([val1, val2])
-                            except:
-                                continue
-                        if values:
-                            chosen_val = min(values)  # Take minimum to avoid concatenated numbers
-                            # Validate the value is reasonable (not concatenated mess)
-                            if chosen_val > 100_000_000_000:  # More than 100B is unrealistic
-                                return '0'  # Return 0 for invalid values
-                            return str(chosen_val)
-                    return str(text)
-                
-                cleaned = cleaned.apply(extract_range_safe)
-                
-                # Handle multiple dollar amounts - take the first significant one
-                # Pattern like "$20,000,000+R ($5,200,000)R" -> take first amount
-                multi_amount_pattern = r'\$(\d+(?:,\d{3})*(?:\.\d+)?)'
-                def extract_first_amount(text):
-                    matches = re.findall(multi_amount_pattern, str(text))
-                    if matches:
-                        # Take the first (usually primary) amount
-                        try:
-                            val = float(matches[0].replace(',', ''))
-                            # Validate the value is reasonable
-                            if val > 100_000_000_000:  # More than 100B is unrealistic
-                                return '0'  # Return 0 for invalid values
-                        except:
-                            return '0'
-                        return matches[0]
-                    return str(text)
-                
-                cleaned = cleaned.apply(extract_first_amount)
-                
-                # Remove footnote references like [1], [n 1], etc.
-                cleaned = cleaned.str.replace(r"\[.*?\]", "", regex=True)
-                cleaned = cleaned.str.replace(
-                    r"\([^)]*\)", "", regex=True
-                )  # Remove parentheses content
-
-                # Remove any other non-numeric characters except decimal points and minus signs
-                cleaned = cleaned.str.replace(r"[^\d.\-]", "", regex=True)
-
-                # Handle empty strings and special cases
-                cleaned = cleaned.replace("", np.nan)
-                cleaned = cleaned.replace("nan", np.nan)
-                cleaned = cleaned.replace("NaN", np.nan)
-                cleaned = cleaned.replace("None", np.nan)
-                cleaned = cleaned.replace("N/A", np.nan)
-                cleaned = cleaned.replace("–", np.nan)  # En dash
-                cleaned = cleaned.replace("—", np.nan)  # Em dash
+                # 2. Remove commas from the extracted number.
+                cleaned = cleaned.str.replace(',', '', regex=False)
 
                 # Convert to numeric
                 numeric_data = pd.to_numeric(cleaned, errors="coerce")
                 
                 # Additional outlier filtering for financial data
                 if 'gross' in col.lower() or 'revenue' in col.lower() or 'box' in col.lower():
-                    # Cap at reasonable maximum for movie revenues (50B would be extreme)
+                    # Cap at a reasonable maximum for movie revenues (e.g., 50B)
                     numeric_data = numeric_data.where(numeric_data <= 50_000_000_000, np.nan)
                     print(f"  Applied movie revenue outlier filtering for {col}")
 
                 # Only replace if we got some valid numbers (at least 5% of data should be numeric)
                 valid_count = numeric_data.notna().sum()
                 total_count = len(data)
-                if valid_count > 0 and valid_count >= max(
-                    3, total_count * 0.05
-                ):  # Lower threshold for small datasets
+                if valid_count > 0 and valid_count >= max(3, total_count * 0.05):
                     print(
                         f"  Converted {valid_count} values to numeric ({valid_count / total_count * 100:.1f}%)"
                     )
                     data[col] = numeric_data
-
-                    # Handle scale factors (if column had billion/million indicators)
-                    original_str = data[col].astype(str).str.lower()
-                    if any(
-                        "billion" in str(val) or "bn" in str(val)
-                        for val in data[col].astype(str).iloc[:5]
-                    ):
-                        print(f"  Detected billion scale factor in {col}")
-                        # Values are likely already in billions, don't multiply
-                    elif any(
-                        "million" in str(val) or "mn" in str(val)
-                        for val in data[col].astype(str).iloc[:5]
-                    ):
-                        print(f"  Detected million scale factor in {col}, converting to billions")
-                        data[col] = data[col] / 1000  # Convert millions to billions
                 else:
                     print(f"  No valid numeric data found ({valid_count} values), keeping as text")
 
