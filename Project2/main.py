@@ -44,9 +44,25 @@ sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "chains
 try:
     # Attempt to initialize the advanced orchestrator
     from chains.workflows import AdvancedWorkflowOrchestrator
+    
+    # Import enhanced workflow components
+    from chains.generalized_workflow import create_data_analysis_workflow
+    from chains.iterative_reasoning import create_iterative_reasoning_workflow
+    from chains.logging_and_benchmarking import workflow_logger, accuracy_benchmark, create_test_benchmark_suite
 
     orchestrator = AdvancedWorkflowOrchestrator()
     logger.info("AdvancedWorkflowOrchestrator initialized successfully.")
+    
+    # Initialize logging and benchmarking
+    logger.info("Workflow logging and benchmarking systems initialized.")
+    
+    # Create test benchmark suite if it doesn't exist
+    try:
+        create_test_benchmark_suite()
+        logger.info("Test benchmark suite created/verified.")
+    except Exception as e:
+        logger.warning(f"Could not create test benchmark suite: {e}")
+    
 except Exception as e:
     logger.error(f"Could not import or initialize workflows: {e}")
     # Try to create a minimal orchestrator with just the fallback workflow
@@ -59,6 +75,28 @@ except Exception as e:
                 super().__init__()  # This was missing
                 self.llm = None
                 self.workflows = {"multi_step_web_scraping": ModularWebScrapingWorkflow()}
+            
+            def get_workflow_capabilities(self) -> Dict[str, Any]:
+                """Return information about available workflows and their capabilities"""
+                return {
+                    "available_workflows": list(self.workflows.keys()),
+                    "workflow_descriptions": {
+                        "multi_step_web_scraping": "Modular web scraping with generic table extraction"
+                    },
+                    "pipeline_capabilities": ["multi_step_workflow"],
+                    "supported_features": [
+                        "Web scraping with automatic table detection",
+                        "Generic data cleaning and analysis",
+                        "Automatic chart generation",
+                        "Question answering based on scraped data"
+                    ],
+                    "orchestrator_type": "MinimalOrchestrator",
+                    "architectural_enhancements": {
+                        "note": "Limited orchestrator - some enhanced features may not be available",
+                        "available": ["modular_steps", "basic_logging"],
+                        "unavailable": ["iterative_reasoning", "cross_model_verification", "rag_enhancement"]
+                    }
+                }
 
         orchestrator = MinimalOrchestrator()
         logger.info("Created minimal orchestrator with fallback workflows")
@@ -335,15 +373,230 @@ def prepare_workflow_parameters(
 async def analyze_data(
     questions_txt: UploadFile = File(..., description="Required questions.txt file"),
     files: List[UploadFile] = File(default=[], description="Optional additional files"),
+    enable_iterative_reasoning: bool = False,
+    enable_logging: bool = True,
 ):
     """
-    Main endpoint that accepts multiple file uploads with required questions.txt.
-    All processing is synchronous and returns results immediately.
-
+    Enhanced main endpoint with architectural improvements including:
+    - Iterative reasoning with self-check passes
+    - Comprehensive logging at each step
+    - Strong data validation layer
+    - Modular and composable workflow system
+    
     - **questions_txt**: Required questions.txt file containing the questions
-      (must contain 'question' in filename)
     - **files**: Optional additional files (images, CSV, JSON, etc.)
+    - **enable_iterative_reasoning**: Use iterative reasoning workflow for higher accuracy
+    - **enable_logging**: Enable detailed step-by-step logging
     """
+    try:  # Enhanced main API endpoint for data analysis
+        task_id = str(uuid.uuid4())
+        logger.info(f"Starting enhanced synchronous task {task_id}")
+
+        # Initialize workflow logging if enabled
+        workflow_execution = None
+        if enable_logging:
+            workflow_execution = workflow_logger.start_workflow(
+                task_id, "enhanced_analysis", {"enable_iterative_reasoning": enable_iterative_reasoning}
+            )
+
+        # Process required questions.txt file
+        if not (questions_txt.filename.lower().endswith(".txt") or "question" in questions_txt.filename.lower()):
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "questions.txt file is required and must be named "
+                    "appropriately (must contain 'question' in filename)"
+                ),
+            )
+
+        questions_content = await questions_txt.read()
+        questions_text = questions_content.decode("utf-8")
+        logger.info(f"Processed questions.txt with {len(questions_text)} characters")
+
+        # Process additional files with enhanced validation
+        processed_files = {}
+        file_contents = {}
+
+        for file in files:
+            if file.filename:
+                content = await file.read()
+                try:
+                    file_text = content.decode("utf-8")
+                    file_contents[file.filename] = file_text
+                    logger.info(f"Processed text file: {file.filename}")
+                except UnicodeDecodeError:
+                    # Handle binary files (images, etc.)
+                    file_contents[file.filename] = f"Binary file: {file.filename} ({len(content)} bytes)"
+                    logger.info(f"Processed binary file: {file.filename} " f"({len(content)} bytes)")
+
+                processed_files[file.filename] = {
+                    "content_type": file.content_type,
+                    "size": len(content),
+                    "is_text": file.filename.endswith((".txt", ".csv", ".json", ".md")),
+                }
+
+        # Use questions as task description (content of questions.txt)
+        task_description = questions_text
+
+        # Intelligent workflow type detection using LLM
+        detected_workflow = await detect_workflow_type_llm(task_description, "multi_step_web_scraping")
+        logger.info(f"Detected workflow: {detected_workflow}")
+        logger.info(f"Task description: {task_description[:200]}...")
+
+        # Prepare enhanced workflow input with validation requirements
+        workflow_input = {
+            "task_description": task_description,
+            "questions": questions_text,
+            "additional_files": file_contents,
+            "processed_files_info": processed_files,
+            "workflow_type": detected_workflow,
+            "parameters": prepare_workflow_parameters(task_description, detected_workflow, questions_text),
+            "output_requirements": extract_output_requirements(task_description),
+            "enable_validation": True,  # Enable strong data validation layer
+            "enable_self_check": enable_iterative_reasoning,  # Enable self-check passes
+            "enable_logging": enable_logging,
+        }
+
+        logger.info(f"Enhanced workflow input prepared with {len(workflow_input)} keys")
+        logger.info(f"Additional files: {list(file_contents.keys())}")
+
+        # Choose workflow execution method based on configuration
+        if enable_iterative_reasoning:
+            logger.info(f"Using iterative reasoning workflow for task {task_id}")
+            result = await execute_iterative_workflow(workflow_input, task_id)
+        else:
+            logger.info(f"Using standard workflow for task {task_id}")
+            result = await execute_workflow_sync(detected_workflow, workflow_input, task_id)
+
+        # Complete workflow logging
+        if workflow_execution and enable_logging:
+            workflow_logger.complete_workflow(result, "completed")
+
+        logger.info(f"Task {task_id} completed successfully")
+        logger.info(f"Result keys: {list(result.keys()) if isinstance(result, dict) else 'Not a dict'}")
+
+        return {
+            "task_id": task_id,
+            "status": "completed",
+            "workflow_type": detected_workflow,
+            "result": result,
+            "processing_info": {
+                "questions_file": questions_txt.filename,
+                "additional_files": list(processed_files.keys()),
+                "workflow_auto_detected": True,
+                "processing_time": "synchronous",
+                "iterative_reasoning_enabled": enable_iterative_reasoning,
+                "logging_enabled": enable_logging,
+                "enhanced_features": [
+                    "data_validation",
+                    "modular_steps",
+                    "comprehensive_logging"
+                ]
+            },
+            "timestamp": datetime.now().isoformat(),
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error processing enhanced request: {str(e)}")
+        if workflow_execution and enable_logging:
+            workflow_logger.complete_workflow({}, "failed", str(e))
+        raise HTTPException(status_code=500, detail=f"Error processing request: {str(e)}")
+
+
+async def execute_iterative_workflow(workflow_input: Dict[str, Any], task_id: str) -> Dict[str, Any]:
+    """Execute enhanced iterative reasoning workflow"""
+    try:
+        # Create iterative reasoning workflow
+        iterative_workflow = create_iterative_reasoning_workflow(
+            llm=orchestrator.llm if orchestrator else None,
+            max_iterations=3,
+            confidence_threshold=0.8
+        )
+        
+        logger.info(f"Executing iterative reasoning workflow for task {task_id}")
+        result = await iterative_workflow.execute(workflow_input)
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Iterative workflow execution failed for task {task_id}: {e}")
+        # Fallback to standard workflow
+        return await execute_workflow_sync("data_analysis", workflow_input, task_id)
+
+
+@app.post("/api/benchmark")
+async def run_accuracy_benchmark(
+    suite_name: str = "test_suite",
+    workflow_type: str = "data_analysis"
+):
+    """
+    Run accuracy benchmarks to measure workflow performance
+    
+    - **suite_name**: Name of the benchmark suite to run
+    - **workflow_type**: Type of workflow to benchmark
+    """
+    try:
+        logger.info(f"Starting accuracy benchmark for {workflow_type} on suite {suite_name}")
+        
+        # Import workflow class
+        from chains.workflows import DataAnalysisWorkflow
+        
+        # Run benchmark
+        benchmark_results = accuracy_benchmark.run_accuracy_benchmark(
+            DataAnalysisWorkflow, 
+            suite_name, 
+            {"llm": orchestrator.llm if orchestrator else None}
+        )
+        
+        return {
+            "benchmark_results": benchmark_results,
+            "suite_name": suite_name,
+            "workflow_type": workflow_type,
+            "timestamp": datetime.now().isoformat(),
+            "status": "completed"
+        }
+        
+    except Exception as e:
+        logger.error(f"Benchmark execution failed: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Benchmark execution failed: {str(e)}"
+        )
+
+
+@app.get("/api/workflow-capabilities")
+async def get_workflow_capabilities():
+    """Get information about available workflows and their capabilities"""
+    try:
+        if orchestrator:
+            capabilities = orchestrator.get_workflow_capabilities()
+        else:
+            capabilities = {
+                "error": "Orchestrator not available",
+                "available_workflows": [],
+                "enhanced_features": []
+            }
+        
+        # Add information about architectural enhancements
+        capabilities["architectural_enhancements"] = {
+            "generalized_data_analysis": "Unified workflow for multiple data source types",
+            "modular_composable_system": "Independent, reusable step functions",
+            "data_validation_layer": "Schema checks, outlier detection, type enforcement",
+            "iterative_reasoning": "Self-check passes with LLM validation",
+            "logging_benchmarking": "Comprehensive step-by-step logging and accuracy tracking",
+            "extensible_workflows": "Plugin pattern for new data sources"
+        }
+        
+        return capabilities
+        
+    except Exception as e:
+        logger.error(f"Error getting workflow capabilities: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error getting capabilities: {str(e)}"
+        )
     try:  # Main API endpoint for data analysis
         task_id = str(uuid.uuid4())
         logger.info(f"Starting synchronous task {task_id}")

@@ -44,6 +44,13 @@ from .web_scraping_steps import (
     AnswerQuestionsStep,
 )
 
+# Import new generalized workflow components
+from .generalized_workflow import (
+    DataAnalysisWorkflow as GeneralizedDataAnalysisWorkflow,
+    ComposableWorkflowBuilder,
+    create_data_analysis_workflow,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -98,27 +105,30 @@ class ExploratoryDataAnalysisWorkflow(BaseWorkflow):
 
 
 class DataAnalysisWorkflow(BaseWorkflow):
-    """Generalized workflow for data analysis tasks"""
+    """
+    Legacy DataAnalysisWorkflow - replaced by GeneralizedDataAnalysisWorkflow
+    but kept for backward compatibility
+    """
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.prompt_template = ChatPromptTemplate.from_messages(
-            [
-                ("system", DATA_ANALYSIS_SYSTEM_PROMPT),
-                ("human", DATA_ANALYSIS_HUMAN_PROMPT),
-            ]
-        )
-        self.chain = LLMChain(llm=self.llm, prompt=self.prompt_template)
+        # Use the new generalized workflow internally
+        self.generalized_workflow = GeneralizedDataAnalysisWorkflow(llm=self.llm, **kwargs)
 
     async def execute(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
-        logger.info("Executing DataAnalysisWorkflow")
+        logger.info("Executing legacy DataAnalysisWorkflow (delegating to generalized version)")
         try:
-            result = self.chain.run(questions=input_data.get("task_description", ""), files=input_data.get("files", []))
+            # Delegate to the new generalized workflow
+            result = await self.generalized_workflow.execute(input_data)
+            
+            # Transform result to maintain backward compatibility
             return {
-                "analysis_result": result,
+                "analysis_result": result.get('formatted_output', {}).get('report', str(result)),
                 "workflow_type": "data_analysis",
                 "status": "completed",
                 "timestamp": datetime.now().isoformat(),
+                "enhanced": True,  # Flag to indicate this is using the enhanced workflow
+                "raw_results": result
             }
         except Exception as e:
             logger.error(f"Error in DataAnalysisWorkflow: {e}")
