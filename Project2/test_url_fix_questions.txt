@@ -1,0 +1,7 @@
+Test URL extraction and CAPTCHA solving
+The task is to scrape data from the ecourts website available at [ecourts website](https://judgments.ecourts.gov.in/).
+
+Questions:
+1. How many High Courts are available in the system?
+2. What search options are provided?
+3. Can the CAPTCHA be solved automatically?

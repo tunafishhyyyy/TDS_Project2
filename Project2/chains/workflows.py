@@ -604,9 +604,16 @@ class MultiStepWebScrapingWorkflow(BaseWorkflow):
             }
 
     def _extract_url_from_task(self, task_description: str) -> str:
-        """Extract URL from task description"""
-
-        url_pattern = r"https?://[^\s]+"
+        """Extract URL from task description, handling Markdown links properly"""
+        
+        # First try to extract from Markdown links [text](url)
+        markdown_pattern = r'\[([^\]]+)\]\((https?://[^\s\)]+)\)'
+        markdown_matches = re.findall(markdown_pattern, task_description)
+        if markdown_matches:
+            return markdown_matches[0][1]  # Return the URL part
+        
+        # Fallback to regular URL extraction, but exclude common punctuation
+        url_pattern = r"https?://[^\s\)\]\},]+"
         urls = re.findall(url_pattern, task_description)
         return urls[0] if urls else ""
 
@@ -891,9 +898,16 @@ class ModularWebScrapingWorkflow(BaseWorkflow):
             }
 
     def _extract_url_from_task(self, task_description: str) -> str:
-        """Extract URL from task description"""
-
-        url_pattern = r"https?://[^\s]+"
+        """Extract URL from task description, handling Markdown links properly"""
+        
+        # First try to extract from Markdown links [text](url)
+        markdown_pattern = r'\[([^\]]+)\]\((https?://[^\s\)]+)\)'
+        markdown_matches = re.findall(markdown_pattern, task_description)
+        if markdown_matches:
+            return markdown_matches[0][1]  # Return the URL part
+        
+        # Fallback to regular URL extraction, but exclude common punctuation
+        url_pattern = r"https?://[^\s\)\]\},]+"
         urls = re.findall(url_pattern, task_description)
         return urls[0] if urls else ""
 

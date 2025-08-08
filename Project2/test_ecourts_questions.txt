@@ -1,0 +1,7 @@
+Test ecourts CAPTCHA functionality
+Website: https://judgments.ecourts.gov.in/
+
+Questions:
+1. How many High Courts are listed?
+2. What types of cases are available?
+3. What is the date range of available judgments?

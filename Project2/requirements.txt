@@ -22,3 +22,5 @@ jinja2
 beautifulsoup4
 lxml
 html5lib
+pytesseract
+pillow

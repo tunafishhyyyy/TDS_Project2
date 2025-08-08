@@ -80,8 +80,16 @@ except Exception as e:
                     task_description = input_data.get("task_description", "")
                     # Extract URL from task description
                     import re
-                    urls = re.findall(r"https?://[^\s]+", task_description)
-                    url = urls[0] if urls else input_data.get("url")
+                    
+                    # First try to extract from Markdown links [text](url)
+                    markdown_pattern = r'\[([^\]]+)\]\((https?://[^\s\)]+)\)'
+                    markdown_matches = re.findall(markdown_pattern, task_description)
+                    if markdown_matches:
+                        url = markdown_matches[0][1]  # Return the URL part
+                    else:
+                        # Fallback to regular URL extraction, but exclude common punctuation
+                        urls = re.findall(r"https?://[^\s\)\]\},]+", task_description)
+                        url = urls[0] if urls else input_data.get("url")
                     if not url:
                         return {
                             "workflow_type": "multi_step_web_scraping",

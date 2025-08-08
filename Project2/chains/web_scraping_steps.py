@@ -2,6 +2,8 @@ import json
 import logging
 import math
 import re
+import base64
+import io
 from typing import Any, Dict, List
 
 import requests
@@ -10,6 +12,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from bs4 import BeautifulSoup
+try:
+    import pytesseract
+    from PIL import Image
+    TESSERACT_AVAILABLE = True
+except ImportError:
+    TESSERACT_AVAILABLE = False
+    print("Warning: pytesseract/PIL not available. CAPTCHA solving disabled.")
 
 from utils.constants import (
     REQUEST_HEADERS, COMMON_DATA_CLASSES, ENGLISH_STOPWORDS, CONTENT_SELECTORS,
@@ -77,13 +86,219 @@ def sanitize_for_json(obj):
 logger = logging.getLogger(__name__)
 
 
+def solve_simple_captcha(session: requests.Session, captcha_img_url: str, base_url: str) -> str:
+    """
+    Attempt to solve simple text-based CAPTCHAs using OCR with enhanced preprocessing.
+    Returns the solved CAPTCHA text or raises an exception if it fails.
+    """
+    if not TESSERACT_AVAILABLE:
+        raise RuntimeError("OCR libraries not available. Cannot solve CAPTCHA.")
+    
+    try:
+        print(f"Downloading CAPTCHA image from: {captcha_img_url}")
+        
+        # Download CAPTCHA image with proper headers
+        img_resp = session.get(captcha_img_url, timeout=10)
+        img_resp.raise_for_status()
+        
+        content_type = img_resp.headers.get('content-type', 'unknown')
+        print(f"Downloaded image, size: {len(img_resp.content)} bytes, content-type: {content_type}")
+        
+        # Load image with PIL
+        img = Image.open(io.BytesIO(img_resp.content))
+        print(f"Original image size: {img.size}, mode: {img.mode}")
+        
+        # Enhanced preprocessing for better OCR results
+        # Convert to grayscale
+        if img.mode != 'L':
+            img = img.convert('L')
+        
+        # Resize image if too small (helps with OCR)
+        width, height = img.size
+        if width < 100 or height < 30:
+            scale = max(100 / width, 30 / height, 2.0)  # At least 2x scaling
+            new_size = (int(width * scale), int(height * scale))
+            img = img.resize(new_size, Image.LANCZOS)
+            print(f"Resized image to: {img.size}")
+        
+        # Apply multiple OCR attempts with different configurations
+        configs = [
+            '--psm 8 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',
+            '--psm 7 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',
+            '--psm 6 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',
+            '--psm 13 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+        ]
+        
+        best_result = ""
+        for config in configs:
+            try:
+                captcha_text = pytesseract.image_to_string(img, config=config).strip()
+                captcha_text = ''.join(c for c in captcha_text if c.isalnum())  # Keep only alphanumeric
+                print(f"OCR attempt with config '{config[:10]}...': '{captcha_text}'")
+                
+                if len(captcha_text) > len(best_result):
+                    best_result = captcha_text
+                    
+                if len(captcha_text) >= 4:  # Good result, use it
+                    break
+            except Exception as e:
+                print(f"OCR config failed: {e}")
+                continue
+        
+        if len(best_result) < 2:  # Still too short
+            # Save image for debugging
+            debug_path = f"/tmp/captcha_debug_{hash(captcha_img_url)}.png"
+            try:
+                img.save(debug_path)
+                print(f"Saved debug image to: {debug_path}")
+            except Exception:
+                pass
+            raise RuntimeError(f"OCR failed: extracted text too short: '{best_result}'. Image saved for debugging.")
+        
+        print(f"Solved CAPTCHA: '{best_result}'")
+        return best_result
+        
+    except Exception as e:
+        raise RuntimeError(f"Failed to solve CAPTCHA: {str(e)}")
+
+
+def handle_captcha_form(session: requests.Session, url: str, html: str) -> str:
+    """
+    Detect and handle CAPTCHA forms by attempting to solve and submit them.
+    Enhanced to handle hidden fields, CSRF tokens, and security measures.
+    Returns the HTML content after successful CAPTCHA submission.
+    """
+    soup = BeautifulSoup(html, 'html.parser')
+    
+    # Look for CAPTCHA form elements
+    captcha_form = soup.find('form')
+    if not captcha_form:
+        raise RuntimeError("No form found on CAPTCHA page")
+    
+    # Find CAPTCHA image
+    captcha_img = soup.find('img')
+    if not captcha_img:
+        raise RuntimeError("No CAPTCHA image found")
+    
+    captcha_img_src = captcha_img.get('src')
+    if not captcha_img_src:
+        raise RuntimeError("CAPTCHA image has no src attribute")
+    
+    # Make image URL absolute
+    from urllib.parse import urljoin
+    captcha_img_url = urljoin(url, captcha_img_src)
+    
+    # Solve CAPTCHA
+    captcha_solution = solve_simple_captcha(session, captcha_img_url, url)
+    
+    # Enhanced form data collection
+    form_data = {}
+    
+    # Collect ALL input fields including hidden ones
+    for input_field in captcha_form.find_all('input'):
+        field_name = input_field.get('name')
+        field_value = input_field.get('value', '')
+        field_type = input_field.get('type', 'text')
+        
+        if field_name:
+            if 'captcha' in field_name.lower() and field_type == 'text':
+                form_data[field_name] = captcha_solution
+                print(f"Set CAPTCHA field '{field_name}' = '{captcha_solution}'")
+            else:
+                form_data[field_name] = field_value
+                print(f"Found field '{field_name}' ({field_type}) = '{field_value}'")
+    
+    # Collect select fields
+    for select_field in captcha_form.find_all('select'):
+        field_name = select_field.get('name')
+        if field_name:
+            # Get selected option or first option
+            selected_option = select_field.find('option', selected=True)
+            if not selected_option:
+                selected_option = select_field.find('option')
+            if selected_option:
+                field_value = selected_option.get('value', selected_option.text)
+                form_data[field_name] = field_value
+                print(f"Found select field '{field_name}' = '{field_value}'")
+    
+    # Collect textarea fields
+    for textarea_field in captcha_form.find_all('textarea'):
+        field_name = textarea_field.get('name')
+        if field_name:
+            field_value = textarea_field.text.strip()
+            form_data[field_name] = field_value
+            print(f"Found textarea field '{field_name}' = '{field_value}'")
+    
+    # Get form action and method
+    form_action = captcha_form.get('action', '')
+    form_url = urljoin(url, form_action) if form_action else url
+    form_method = captcha_form.get('method', 'post').lower()
+    
+    # Add common headers for form submission
+    headers = {
+        'Referer': url,
+        'Origin': urljoin(url, '/'),
+        'Content-Type': 'application/x-www-form-urlencoded',
+    }
+    
+    print(f"Submitting CAPTCHA form to {form_url} via {form_method.upper()}")
+    print(f"Form data: {form_data}")
+    print(f"Headers: {headers}")
+    
+    # Submit form with enhanced headers
+    try:
+        if form_method == 'get':
+            resp = session.get(form_url, params=form_data, headers=headers, timeout=20)
+        else:
+            resp = session.post(form_url, data=form_data, headers=headers, timeout=20)
+        
+        print(f"Form submission response: {resp.status_code} {resp.reason}")
+        
+        # Check for security page redirect or error
+        if resp.status_code == 405 or 'security' in resp.text.lower():
+            # Try alternative approach - maybe GET with all parameters
+            if form_method == 'post':
+                print("POST failed, trying GET method...")
+                resp = session.get(form_url, params=form_data, headers=headers, timeout=20)
+                print(f"GET attempt response: {resp.status_code} {resp.reason}")
+        
+        resp.raise_for_status()
+        return resp.text
+        
+    except Exception as e:
+        print(f"Form submission failed: {e}")
+        # Return original error with more details
+        raise RuntimeError(f"Form submission error: {str(e)}. Response code: {getattr(resp, 'status_code', 'N/A')}")
+
+
+
 def fetch_html(url: str, timeout: int = 20) -> str:
-    """Fetch HTML with proper headers via a session to avoid 400/403 blocks."""
+    """Fetch HTML with proper headers via a session. Handles redirects and attempts to solve simple CAPTCHAs."""
     session = requests.Session()
     session.headers.update(REQUEST_HEADERS)
-    resp = session.get(url, timeout=timeout)
+    resp = session.get(url, timeout=timeout, allow_redirects=True)
+    # Log redirect chain
+    if resp.history:
+        print(f"Redirects for {url}:")
+        for r in resp.history:
+            print(f"  {r.status_code} -> {r.url}")
+        print(f"Final URL: {resp.url}")
     resp.raise_for_status()
-    return resp.text
+    html = resp.text
+    
+    # CAPTCHA detection and handling
+    lower_html = html.lower()
+    captcha_indicators = ["captcha", "verify", "robot"]  # Removed recaptcha/cloudflare (too complex)
+    
+    if any(word in lower_html for word in captcha_indicators):
+        print(f"CAPTCHA detected for {url}. Attempting to solve...")
+        try:
+            html = handle_captcha_form(session, resp.url, html)
+            print("CAPTCHA solved successfully!")
+        except Exception as e:
+            raise RuntimeError(f"CAPTCHA detected for {url} but failed to solve: {str(e)}. Manual intervention required.")
+    
+    return html
 
 
 class DetectDataFormatStep:

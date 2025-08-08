@@ -1,0 +1,1 @@
+Navigate to [ECourts Case Status](https://judgments.ecourts.gov.in/). This is a government website that provides information about court cases in India.

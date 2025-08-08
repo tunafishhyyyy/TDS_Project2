@@ -2,7 +2,6 @@
 Modular and composable data analysis steps that can be used across different workflows.
 Each step is independent, reusable, and follows a consistent interface.
 """
-```
 
 import logging
 import json
@@ -19,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 class BaseDataAnalysisStep(ABC):
     """Base class for all data analysis steps"""
-```
+
     """Base class for all data analysis steps"""
 
     def __init__(self, llm=None, **kwargs):
@@ -39,7 +38,7 @@ class BaseDataAnalysisStep(ABC):
         return True
 class DataIngestionStep(BaseDataAnalysisStep):
     """Generic data ingestion step that handles multiple data source types"""
-```
+
 class DataIngestionStep(BaseDataAnalysisStep):
     """Generic data ingestion step that handles multiple data source types"""
 
@@ -123,7 +122,7 @@ class DataIngestionStep(BaseDataAnalysisStep):
         result = scraper.run(input_data)
 class DataValidationStep(BaseDataAnalysisStep):
     """Strong data validation layer with schema checks, outlier detection, and type enforcement"""
-```
+
 
 class DataValidationStep(BaseDataAnalysisStep):
     """Strong data validation layer with schema checks, outlier detection, and type enforcement"""
@@ -306,7 +305,7 @@ class DataValidationStep(BaseDataAnalysisStep):
             logger.info(f"Dropped columns with <10% completeness: {cols_to_drop}")
 class DataPreprocessingStep(BaseDataAnalysisStep):
     """Generic data preprocessing step with cleaning and normalization"""
-```
+
 
 
 class DataPreprocessingStep(BaseDataAnalysisStep):
@@ -442,9 +441,8 @@ class DataPreprocessingStep(BaseDataAnalysisStep):
                 unique_values = processed_data[col].unique()
                 encoding_map = {val: idx for idx, val in enumerate(unique_values)}
                 processed_data[f"{col}_encoded"] = processed_data[col].map(encoding_map)
-class AnalysisStep(BaseDataAnalysisStep):
-    """LLM / ML - based analysis step with flexible analysis types"""
-```
+                encoded_cols.append(col)
+
         return processed_data, f"Encoded {len(encoded_cols)} categorical columns: {encoded_cols}"
 
 
@@ -645,9 +643,8 @@ class AnalysisStep(BaseDataAnalysisStep):
         return {'analysis_type': 'clustering', 'message': 'Clustering analysis implementation needed'}
 
     def _statistical_test_analysis(self, data: pd.DataFrame, task_description: str, config: Dict[str, Any]) -> Dict[str, Any]:
-class VisualizationStep(BaseDataAnalysisStep):
-    """Visualization step with automatic chart type detection and generation"""
-```
+        """Perform statistical test analysis"""
+        # This is a simplified implementation
         # In a real scenario, this would perform appropriate statistical tests
         return {'analysis_type': 'statistical_test', 'message': 'Statistical test analysis implementation needed'}
 
@@ -800,9 +797,6 @@ class VisualizationStep(BaseDataAnalysisStep):
             'y_column': y_column,
             'purpose': recommendation.get('purpose', ''),
             'data_points': len(data),
-class OutputStep(BaseDataAnalysisStep):
-    """Final output step that formats and structures results"""
-```
         }
 
         return viz_info
