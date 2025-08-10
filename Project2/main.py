@@ -333,8 +333,8 @@ def prepare_workflow_parameters(
 
 @app.post("/api/")
 async def analyze_data(
-    questions_txt: UploadFile = File(..., description="Required questions.txt file"),
-    files: List[UploadFile] = File(default=[], description="Optional additional files"),
+    questions_txt: UploadFile = File(..., alias="questions.txt", description="Required questions.txt file (must contain 'question' in filename)"),
+    files: List[UploadFile] = File(default=[], description="Optional additional files (CSV, images, etc.)"),
 ):
     """
     Main endpoint that accepts multiple file uploads with required questions.txt.
@@ -349,6 +349,8 @@ async def analyze_data(
         logger.info(f"Starting synchronous task {task_id}")
 
         # Process required questions.txt file
+
+        # Validate required questions.txt file
         if not (questions_txt.filename.lower().endswith(".txt") or "question" in questions_txt.filename.lower()):
             raise HTTPException(
                 status_code=400,
@@ -362,26 +364,41 @@ async def analyze_data(
         questions_text = questions_content.decode("utf-8")
         logger.info(f"Processed questions.txt with {len(questions_text)} characters")
 
-        # Process additional files
+        # Process additional files (CSV, images, etc.)
         processed_files = {}
         file_contents = {}
 
         for file in files:
             if file.filename:
                 content = await file.read()
-                try:
-                    file_text = content.decode("utf-8")
-                    file_contents[file.filename] = file_text
-                    logger.info(f"Processed text file: {file.filename}")
-                except UnicodeDecodeError:
-                    # Handle binary files (images, etc.)
-                    file_contents[file.filename] = f"Binary file: {file.filename} ({len(content)} bytes)"
-                    logger.info(f"Processed binary file: {file.filename} " f"({len(content)} bytes)")
+                # Handle CSV files
+                if file.filename.lower().endswith(".csv"):
+                    try:
+                        file_text = content.decode("utf-8")
+                        file_contents[file.filename] = file_text
+                        logger.info(f"Processed CSV file: {file.filename}")
+                    except UnicodeDecodeError:
+                        file_contents[file.filename] = f"Binary CSV file: {file.filename} ({len(content)} bytes)"
+                        logger.info(f"Processed binary CSV file: {file.filename} ({len(content)} bytes)")
+                # Handle image files
+                elif file.filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp')):
+                    file_contents[file.filename] = content  # Store raw bytes for images
+                    logger.info(f"Processed image file: {file.filename} ({len(content)} bytes)")
+                # Handle other text files
+                else:
+                    try:
+                        file_text = content.decode("utf-8")
+                        file_contents[file.filename] = file_text
+                        logger.info(f"Processed text file: {file.filename}")
+                    except UnicodeDecodeError:
+                        file_contents[file.filename] = f"Binary file: {file.filename} ({len(content)} bytes)"
+                        logger.info(f"Processed binary file: {file.filename} ({len(content)} bytes)")
 
                 processed_files[file.filename] = {
                     "content_type": file.content_type,
                     "size": len(content),
                     "is_text": file.filename.endswith((".txt", ".csv", ".json", ".md")),
+                    "is_image": file.filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp')),
                 }
 
         # Use questions as task description (content of questions.txt)

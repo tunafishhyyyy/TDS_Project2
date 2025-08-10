@@ -1791,49 +1791,6 @@ class AnswerQuestionsStep:
                 )
             )
 
-            # Basic statistics and rankings
-            if len(top_n_df) >= 5:
-                rank_5_item = top_n_df.iloc[4][name_col]
-                rank_5_value = top_n_df.iloc[4][analysis_col]
-                answers["item_ranking_5th"] = rank_5_item
-                answers["item_ranking_5th_value"] = rank_5_value
-                print(f"Item ranking 5th: {rank_5_item} ({rank_5_value:,.2f})")
-            else:
-                answers["item_ranking_5th"] = f"Only {len(top_n_df)} items available"
-                answers["item_ranking_5th_value"] = 0
-                print(f"Not enough data - only {len(top_n_df)} items in dataset")
-
-            # Total and average calculations
-            total_top_n = top_n_df[analysis_col].sum()
-            avg_top_n = top_n_df[analysis_col].mean()
-            answers["total_top_n"] = total_top_n
-            answers["average_top_n"] = avg_top_n
-            print(f"Total {analysis_col} of top {len(top_n_df)}: {total_top_n:,.2f}")
-            print(f"Average {analysis_col} of top {len(top_n_df)}: {avg_top_n:,.2f}")
-
-            # Range analysis
-            if len(data_clean) > 0:
-                max_value = data_clean[analysis_col].max()
-                min_value = data_clean[analysis_col].min()
-                answers["max_value"] = max_value
-                answers["min_value"] = min_value
-                answers["range"] = max_value - min_value
-                print(f"Range: {min_value:,.2f} to {max_value:,.2f}")
-
-            # Correlation analysis if multiple numeric columns
-            numeric_cols = data_clean.select_dtypes(include=[np.number]).columns.tolist()
-            if len(numeric_cols) >= 2:
-                correlations = {}
-                for i, col1 in enumerate(numeric_cols):
-                    for col2 in numeric_cols[i + 1 :]:
-                        try:
-                            corr = data_clean[[col1, col2]].corr().iloc[0, 1]
-                            correlations[f"{col1}_vs_{col2}"] = corr
-                            print(f"Correlation {col1} vs {col2}: {corr:.3f}")
-                        except Exception:
-                            pass
-                answers["correlations"] = correlations
-
         # Use generic LLM-based question answering for all data types
         llm_answers = self._answer_questions_with_llm(
             data_clean, top_n_df, analysis_col, name_col, task_description
@@ -1849,6 +1806,10 @@ class AnswerQuestionsStep:
             top_list = []
             for i, (idx, row) in enumerate(top_n_df.iterrows()):
                 pass  # Removed top_n_list and summary from response
+
+            # Remove items_before_2000 if present
+            if "items_before_2000" in answers:
+                del answers["items_before_2000"]
 
             answers["status"] = "success"
 
