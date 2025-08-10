@@ -1848,24 +1848,7 @@ class AnswerQuestionsStep:
             )  # Full top N list for reference
             top_list = []
             for i, (idx, row) in enumerate(top_n_df.iterrows()):
-                top_list.append(
-                    {
-                        "rank": i + 1,
-                        "name": row[name_col],
-                        "value": row[analysis_col],
-                    }
-                )
-            answers["top_n_list"] = top_list
-
-            # Summary metadata
-            answers["summary"] = {
-                "analysis_column": analysis_col,
-                "name_column": name_col,
-                "total_items_analyzed": len(top_n_df),
-                "total_items_in_dataset": (len(data_clean) if data_clean is not None else 0),
-                "data_type": self._identify_data_type(analysis_col, task_description),
-                "domain": self._identify_domain(task_description),
-            }
+                pass  # Removed top_n_list and summary from response
 
             answers["status"] = "success"
 
