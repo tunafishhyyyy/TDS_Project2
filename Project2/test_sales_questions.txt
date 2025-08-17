@@ -1,0 +1,7 @@
+1. What is the total sales across all regions?
+2. Which region has the highest total sales?
+3. What is the correlation between day and sales?
+4. Create a bar chart showing total sales by region.
+5. Calculate the total sales tax at 10% rate.
+6. Create a cumulative sales chart over time.
+7. What is the median sales value?

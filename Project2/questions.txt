@@ -1,9 +1,7 @@
-Scrape IMDb Ratings for Top Movies
-Scrape the top 50 movies from:
-https://www.imdb.com/chart/top
-Then:
-Extract movie name, year, rating.
-Create a histogram of IMDb ratings.
-Answer:
-What is the average rating?
-Which decade has the most top-rated movies?
+1. What is the total sales across all regions?
+2. Which region has the highest total sales?
+3. What is the correlation between day and sales?
+4. Create a bar chart showing total sales by region.
+5. What is the degree of each node? What is the clustering coefficient? What is the edge density? What is the diameter of the graph? Create a network visualization.
+6. Calculate the total sales tax at 10% rate.
+7. Create a cumulative sales chart over time.
