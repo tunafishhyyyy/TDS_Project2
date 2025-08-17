@@ -987,80 +987,247 @@ class GenericCSVAnalysisWorkflow(BaseWorkflow):
         # Generic analysis patterns
         combined_text = (task_description + " " + questions).lower()
         
-        # 1. Total/Sum calculations
-        if any(word in combined_text for word in ['total', 'sum']):
-            if 'sales' in combined_text and 'sales' in df.columns:
-                result['total_sales'] = int(df['sales'].sum())
-            elif numeric_columns:
-                # Use the first numeric column as default
-                main_col = numeric_columns[0]
-                result[f'total_{main_col}'] = int(df[main_col].sum())
+        # Check if this is weather data
+        is_weather_data = self._is_weather_data(df, combined_text)
         
-        # 2. Top/Highest region/category analysis
-        if any(word in combined_text for word in ['top', 'highest', 'best']):
-            if 'region' in df.columns and 'sales' in df.columns:
-                top_region = df.groupby('region')['sales'].sum().idxmax()
-                result['top_region'] = top_region
-            elif len(categorical_columns) > 0 and len(numeric_columns) > 0:
-                cat_col = categorical_columns[0]
-                num_col = numeric_columns[0]
-                top_category = df.groupby(cat_col)[num_col].sum().idxmax()
-                result[f'top_{cat_col}'] = top_category
-        
-        # 3. Correlation analysis
-        if 'correlation' in combined_text:
-            if date_columns and 'sales' in df.columns:
-                # Extract day from date and correlate with sales
-                df_temp = df.copy()
-                df_temp['date_parsed'] = pd.to_datetime(df_temp[date_columns[0]])
-                df_temp['day'] = df_temp['date_parsed'].dt.day
-                correlation = df_temp['day'].corr(df_temp['sales'])
-                result['day_sales_correlation'] = round(correlation, 3)
-            elif len(numeric_columns) >= 2:
-                # Correlate first two numeric columns
-                correlation = df[numeric_columns[0]].corr(df[numeric_columns[1]])
-                result[f'{numeric_columns[0]}_{numeric_columns[1]}_correlation'] = round(correlation, 3)
-        
-        # 4. Median calculations
-        if 'median' in combined_text:
-            if 'sales' in df.columns:
-                result['median_sales'] = int(df['sales'].median())
-            elif numeric_columns:
-                main_col = numeric_columns[0]
-                result[f'median_{main_col}'] = int(df[main_col].median())
-        
-        # 5. Tax calculations
-        if 'tax' in combined_text:
-            if 'sales' in df.columns:
-                tax_rate = 0.10  # Default 10%
-                # Extract tax rate from text if specified
-                import re
-                tax_match = re.search(r'(\d+(?:\.\d+)?)%', combined_text)
-                if tax_match:
-                    tax_rate = float(tax_match.group(1)) / 100
-                result['total_sales_tax'] = int(df['sales'].sum() * tax_rate)
-        
-        # 6. Visualizations
-        if any(word in combined_text for word in ['chart', 'plot', 'graph', 'visualize']):
-            # Bar chart
-            if 'bar' in combined_text:
-                chart_data = self._create_bar_chart(df, categorical_columns, numeric_columns)
-                if chart_data:
-                    result['bar_chart'] = chart_data
+        if is_weather_data:
+            # Perform weather-specific analysis
+            weather_result = await self._perform_weather_analysis(df, combined_text)
+            result.update(weather_result)
+        else:
+            # Perform generic analysis patterns
             
-            # Line chart / cumulative chart
-            if any(word in combined_text for word in ['line', 'cumulative', 'time']):
-                chart_data = self._create_line_chart(df, date_columns, numeric_columns)
-                if chart_data:
-                    result['cumulative_sales_chart'] = chart_data
+            # 1. Total/Sum calculations
+            if any(word in combined_text for word in ['total', 'sum']):
+                if 'sales' in combined_text and 'sales' in df.columns:
+                    result['total_sales'] = int(df['sales'].sum())
+                elif numeric_columns:
+                    # Use the first numeric column as default
+                    main_col = numeric_columns[0]
+                    result[f'total_{main_col}'] = int(df[main_col].sum())
             
-            # Scatter plot
-            if 'scatter' in combined_text:
-                chart_data = self._create_scatter_plot(df, numeric_columns)
-                if chart_data:
-                    result['scatter_plot'] = chart_data
+            # 2. Top/Highest region/category analysis
+            if any(word in combined_text for word in ['top', 'highest', 'best']):
+                if 'region' in df.columns and 'sales' in df.columns:
+                    top_region = df.groupby('region')['sales'].sum().idxmax()
+                    result['top_region'] = top_region
+                elif len(categorical_columns) > 0 and len(numeric_columns) > 0:
+                    cat_col = categorical_columns[0]
+                    num_col = numeric_columns[0]
+                    top_category = df.groupby(cat_col)[num_col].sum().idxmax()
+                    result[f'top_{cat_col}'] = top_category
+            
+            # 3. Correlation analysis
+            if 'correlation' in combined_text:
+                if date_columns and 'sales' in df.columns:
+                    # Extract day from date and correlate with sales
+                    df_temp = df.copy()
+                    df_temp['date_parsed'] = pd.to_datetime(df_temp[date_columns[0]])
+                    df_temp['day'] = df_temp['date_parsed'].dt.day
+                    correlation = df_temp['day'].corr(df_temp['sales'])
+                    result['day_sales_correlation'] = round(correlation, 3)
+                elif len(numeric_columns) >= 2:
+                    # Correlate first two numeric columns
+                    correlation = df[numeric_columns[0]].corr(df[numeric_columns[1]])
+                    result[f'{numeric_columns[0]}_{numeric_columns[1]}_correlation'] = round(correlation, 3)
+            
+            # 4. Median calculations
+            if 'median' in combined_text:
+                if 'sales' in df.columns:
+                    result['median_sales'] = int(df['sales'].median())
+                elif numeric_columns:
+                    main_col = numeric_columns[0]
+                    result[f'median_{main_col}'] = int(df[main_col].median())
+            
+            # 5. Tax calculations
+            if 'tax' in combined_text:
+                if 'sales' in df.columns:
+                    tax_rate = 0.10  # Default 10%
+                    # Extract tax rate from text if specified
+                    import re
+                    tax_match = re.search(r'(\d+(?:\.\d+)?)%', combined_text)
+                    if tax_match:
+                        tax_rate = float(tax_match.group(1)) / 100
+                    result['total_sales_tax'] = int(df['sales'].sum() * tax_rate)
+            
+            # 6. Generic Visualizations
+            if any(word in combined_text for word in ['chart', 'plot', 'graph', 'visualize']):
+                # Bar chart
+                if 'bar' in combined_text:
+                    chart_data = self._create_bar_chart(df, categorical_columns, numeric_columns)
+                    if chart_data:
+                        result['bar_chart'] = chart_data
+                
+                # Line chart / cumulative chart
+                if any(word in combined_text for word in ['line', 'cumulative', 'time']):
+                    chart_data = self._create_line_chart(df, date_columns, numeric_columns)
+                    if chart_data:
+                        result['cumulative_sales_chart'] = chart_data
+                
+                # Scatter plot
+                if 'scatter' in combined_text:
+                    chart_data = self._create_scatter_plot(df, numeric_columns)
+                    if chart_data:
+                        result['scatter_plot'] = chart_data
         
         return result
+    
+    def _is_weather_data(self, df: pd.DataFrame, combined_text: str) -> bool:
+        """Detect if this is weather data"""
+        weather_indicators = ['temperature', 'temp', 'precipitation', 'precip', 'weather', 'climate']
+        weather_columns = ['temperature_c', 'temp_c', 'precip_mm', 'precipitation_mm', 'rainfall']
+        
+        # Check if any weather keywords are in the text
+        text_has_weather = any(indicator in combined_text for indicator in weather_indicators)
+        
+        # Check if any weather-related columns exist
+        columns_have_weather = any(col in df.columns for col in weather_columns)
+        
+        # Also check for temperature and precipitation columns specifically
+        has_temp_col = any('temp' in col.lower() for col in df.columns)
+        has_precip_col = any('precip' in col.lower() for col in df.columns)
+        
+        return text_has_weather or columns_have_weather or (has_temp_col and has_precip_col)
+    
+    async def _perform_weather_analysis(self, df: pd.DataFrame, combined_text: str) -> Dict[str, Any]:
+        """Perform weather-specific analysis"""
+        result = {}
+        
+        # Find temperature and precipitation columns
+        temp_col = None
+        precip_col = None
+        date_col = None
+        
+        for col in df.columns:
+            if 'temp' in col.lower():
+                temp_col = col
+            elif 'precip' in col.lower():
+                precip_col = col
+            elif 'date' in col.lower():
+                date_col = col
+        
+        # Calculate weather metrics
+        if temp_col:
+            result['average_temp_c'] = round(df[temp_col].mean(), 1)
+            min_temp_idx = df[temp_col].idxmin()
+            result['min_temp_c'] = float(df.loc[min_temp_idx, temp_col])
+            
+            # Get min temp date if available
+            if date_col:
+                result['min_temp_date'] = str(df.loc[min_temp_idx, date_col])
+        
+        if precip_col:
+            result['average_precip_mm'] = round(df[precip_col].mean(), 1)
+            max_precip_idx = df[precip_col].idxmax()
+            
+            # Get max precip date if available
+            if date_col:
+                result['max_precip_date'] = str(df.loc[max_precip_idx, date_col])
+        
+        # Calculate correlation between temperature and precipitation
+        if temp_col and precip_col:
+            correlation = df[temp_col].corr(df[precip_col])
+            result['temp_precip_correlation'] = round(correlation, 3)
+        
+        # Create weather-specific visualizations
+        if any(word in combined_text for word in ['chart', 'plot', 'graph', 'visualize']):
+            # Temperature line chart
+            if temp_col and ('temp' in combined_text or 'line' in combined_text):
+                temp_chart = self._create_weather_temp_chart(df, temp_col, date_col)
+                if temp_chart:
+                    result['temp_line_chart'] = temp_chart
+            
+            # Precipitation histogram
+            if precip_col and ('precip' in combined_text or 'histogram' in combined_text or 'hist' in combined_text):
+                precip_chart = self._create_weather_precip_histogram(df, precip_col)
+                if precip_chart:
+                    result['precip_histogram'] = precip_chart
+        
+        return result
+    
+    def _create_weather_temp_chart(self, df: pd.DataFrame, temp_col: str, date_col: str = None) -> str:
+        """Create temperature line chart with red line"""
+        try:
+            import matplotlib.pyplot as plt
+            import base64
+            from io import BytesIO
+            
+            plt.figure(figsize=(10, 6))
+            
+            if date_col:
+                # Try to parse dates for x-axis
+                try:
+                    dates = pd.to_datetime(df[date_col])
+                    plt.plot(dates, df[temp_col], color='red', linewidth=2, marker='o')
+                    plt.xlabel('Date')
+                    plt.xticks(rotation=45)
+                except:
+                    # Fall back to index if date parsing fails
+                    plt.plot(df.index, df[temp_col], color='red', linewidth=2, marker='o')
+                    plt.xlabel('Day')
+            else:
+                plt.plot(df.index, df[temp_col], color='red', linewidth=2, marker='o')
+                plt.xlabel('Day')
+            
+            plt.ylabel('Temperature (°C)')
+            plt.title('Temperature Over Time')
+            plt.grid(True, alpha=0.3)
+            plt.tight_layout()
+            
+            # Convert to base64
+            buffer = BytesIO()
+            plt.savefig(buffer, format='png', dpi=100, bbox_inches='tight')
+            buffer.seek(0)
+            
+            # Check size and reduce quality if needed
+            if buffer.getbuffer().nbytes > 100000:  # 100KB
+                plt.savefig(buffer, format='png', dpi=80, bbox_inches='tight')
+                buffer.seek(0)
+            
+            image_base64 = base64.b64encode(buffer.getvalue()).decode()
+            plt.close()
+            
+            return image_base64
+            
+        except Exception as e:
+            print(f"Error creating temperature chart: {e}")
+            return None
+    
+    def _create_weather_precip_histogram(self, df: pd.DataFrame, precip_col: str) -> str:
+        """Create precipitation histogram with orange bars"""
+        try:
+            import matplotlib.pyplot as plt
+            import base64
+            from io import BytesIO
+            
+            plt.figure(figsize=(10, 6))
+            
+            # Create histogram with orange bars
+            plt.hist(df[precip_col], bins=5, color='orange', alpha=0.7, edgecolor='black')
+            plt.xlabel('Precipitation (mm)')
+            plt.ylabel('Frequency')
+            plt.title('Precipitation Distribution')
+            plt.grid(True, alpha=0.3)
+            plt.tight_layout()
+            
+            # Convert to base64
+            buffer = BytesIO()
+            plt.savefig(buffer, format='png', dpi=100, bbox_inches='tight')
+            buffer.seek(0)
+            
+            # Check size and reduce quality if needed
+            if buffer.getbuffer().nbytes > 100000:  # 100KB
+                plt.savefig(buffer, format='png', dpi=80, bbox_inches='tight')
+                buffer.seek(0)
+            
+            image_base64 = base64.b64encode(buffer.getvalue()).decode()
+            plt.close()
+            
+            return image_base64
+            
+        except Exception as e:
+            print(f"Error creating precipitation histogram: {e}")
+            return None
 
     def _create_bar_chart(self, df: pd.DataFrame, categorical_columns: List[str], numeric_columns: List[str]) -> str:
         """Create a generic bar chart"""

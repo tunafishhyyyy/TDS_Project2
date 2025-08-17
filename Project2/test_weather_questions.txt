@@ -1,0 +1,9 @@
+Weather Analysis Questions:
+
+1. What is the average temperature in Celsius?
+2. On which date was precipitation highest?
+3. What is the minimum temperature recorded?
+4. What is the correlation between temperature and precipitation?
+5. What is the average precipitation in millimeters?
+6. Plot temperature over time as a line chart with a red line. Encode as base64 PNG.
+7. Plot precipitation as a histogram with orange bars. Encode as base64 PNG.
