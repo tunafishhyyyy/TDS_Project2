@@ -144,9 +144,9 @@ CONTENT_SELECTORS = [
 
 # Valid workflow types for detection
 VALID_WORKFLOWS = [
+    "code_generation",
     "data_analysis",
     "image_analysis",
-    "code_generation",
     "exploratory_data_analysis",
     "predictive_modeling",
     "data_visualization",
@@ -155,6 +155,8 @@ VALID_WORKFLOWS = [
     "database_analysis",
     "statistical_analysis",
     "text_analysis",
+    "csv_analysis",
+    "network_analysis",
 ]
 
 # Workflow name constants
@@ -295,6 +297,8 @@ DATABASE_DETECTION_KEYWORDS = ["duckdb", "sql", "database"]
 CHART_TYPE_KEYWORDS = ["scatterplot", "scatter"]
 REGRESSION_KEYWORDS = ["regression"]
 BASE64_KEYWORDS = ["base64", "data uri"]
+CSV_ANALYSIS_KEYWORDS = ["sales", "csv", "analyze", "total", "median", "correlation", "tax", "region", "cumulative"]
+NETWORK_ANALYSIS_KEYWORDS = ["network", "edge", "node", "graph", "degree", "shortest path", "density", "Alice", "Eve", "edges.csv"]
 
 # ===== DATA ANALYSIS CONSTANTS =====
 

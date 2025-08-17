@@ -26,7 +26,8 @@ from utils.constants import (
     FORMAT_KEYWORDS, KEY_INCLUDE_VISUALIZATIONS, KEY_VISUALIZATION_FORMAT,
     KEY_MAX_SIZE, KEY_FORMAT, VISUALIZATION_FORMAT_BASE64, MAX_SIZE_BYTES,
     FINANCIAL_DETECTION_KEYWORDS, RANKING_DETECTION_KEYWORDS, DATABASE_DETECTION_KEYWORDS,
-    CHART_TYPE_KEYWORDS, REGRESSION_KEYWORDS, BASE64_KEYWORDS, URL_PATTERN, S3_PATH_PATTERN
+    CHART_TYPE_KEYWORDS, REGRESSION_KEYWORDS, BASE64_KEYWORDS, URL_PATTERN, S3_PATH_PATTERN,
+    CSV_ANALYSIS_KEYWORDS, NETWORK_ANALYSIS_KEYWORDS
 )
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -202,19 +203,19 @@ async def detect_workflow_type_llm(
                 return detected_workflow
             else:
                 logger.warning(f"LLM returned invalid workflow: {detected_workflow}, " f"using fallback")
-                return detect_workflow_type_fallback(task_description, default_workflow)
+                return detect_workflow_type_fallback(task_description, default_workflow, {})
 
         else:
             logger.warning("LLM not available, using fallback workflow detection")
-            return detect_workflow_type_fallback(task_description, default_workflow)
+            return detect_workflow_type_fallback(task_description, default_workflow, {})
 
     except Exception as e:
         logger.error(f"Error in LLM workflow detection: {e}")
-        return detect_workflow_type_fallback(task_description, default_workflow)
+        return detect_workflow_type_fallback(task_description, default_workflow, {})
 
 
 def detect_workflow_type_fallback(
-    task_description: str, default_workflow: str = DEFAULT_WORKFLOW
+    task_description: str, default_workflow: str = DEFAULT_WORKFLOW, additional_files: Dict[str, Any] = None
 ) -> str:  # Fallback keyword-based workflow detection
     """
     Fallback keyword-based workflow detection when LLM is not available
@@ -223,6 +224,21 @@ def detect_workflow_type_fallback(
         return default_workflow
 
     task_lower = task_description.lower()
+    
+    # Check if CSV files are uploaded - strong indicator for CSV analysis
+    if additional_files:
+        csv_files = [f for f in additional_files.keys() if f.lower().endswith('.csv')]
+        if csv_files:
+            # Check if it's network analysis (edges.csv or network-related keywords)
+            network_file_check = any('edge' in f.lower() for f in csv_files)
+            network_keyword_check = any(keyword in task_lower for keyword in NETWORK_ANALYSIS_KEYWORDS)
+            if network_file_check or network_keyword_check:
+                return "network_analysis"
+            
+            # If CSV files are present and task mentions analysis keywords, use CSV analysis
+            analysis_keywords = ['analyze', 'analysis', 'total', 'sales', 'median', 'correlation', 'chart', 'plot']
+            if any(keyword in task_lower for keyword in analysis_keywords):
+                return "csv_analysis"
 
     # DuckDB/database detection (priority)
     duckdb_keywords = ["duckdb", "parquet", "s3://", "bucket", "sql", "select count(*)", "read_parquet"]
@@ -232,6 +248,14 @@ def detect_workflow_type_fallback(
     # Database analysis patterns
     if any(keyword in task_lower for keyword in DB_KEYWORDS):
         return "database_analysis"
+
+    # Network analysis patterns
+    if any(keyword in task_lower for keyword in NETWORK_ANALYSIS_KEYWORDS):
+        return "network_analysis"
+
+    # CSV analysis patterns (check before general data analysis)
+    if any(keyword in task_lower for keyword in CSV_ANALYSIS_KEYWORDS):
+        return "csv_analysis"
 
     # Web scraping patterns
     if any(keyword in task_lower for keyword in SCRAPING_KEYWORDS):
@@ -308,6 +332,8 @@ def prepare_workflow_parameters(
         params["file_content_length"] = len(file_content)
         content_stripped = file_content.strip()
         if content_stripped.startswith(("{", "[")):
+
+            # Save questions.txt to /tmp
             params["content_type"] = CONTENT_TYPE_JSON
         elif "\t" in file_content or "," in file_content:
             params["content_type"] = CONTENT_TYPE_CSV
@@ -350,6 +376,17 @@ async def analyze_data(
         questions_text = questions_content.decode("utf-8")
         logger.info(f"Processed questions.txt with {len(questions_text)} characters")
 
+        # Save questions.txt to /tmp with timestamp
+        timestamp_str = datetime.now().strftime("%Y%m%d%H%M%S")
+        questions_save_name = f"{os.path.splitext(questions_txt.filename)[0]}_{timestamp_str}{os.path.splitext(questions_txt.filename)[1]}"
+        tmp_questions_path = os.path.join("/tmp", questions_save_name)
+        try:
+            with open(tmp_questions_path, "wb") as f:
+                f.write(questions_content)
+            logger.info(f"Saved questions.txt to {tmp_questions_path}")
+        except Exception as e:
+            logger.error(f"Failed to save questions.txt to /tmp: {e}")
+
         # Process additional files (CSV, images, etc.)
         processed_files = {}
         file_contents = {}
@@ -387,11 +424,36 @@ async def analyze_data(
                     "is_image": file.filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp')),
                 }
 
+                # Save each uploaded file to /tmp with timestamp
+                file_save_name = f"{os.path.splitext(file.filename)[0]}_{timestamp_str}{os.path.splitext(file.filename)[1]}"
+                tmp_file_path = os.path.join("/tmp", file_save_name)
+                try:
+                    with open(tmp_file_path, "wb") as f:
+                        f.write(content)
+                    logger.info(f"Saved {file.filename} to {tmp_file_path}")
+                    
+                    # Store the actual saved file path in file_contents for workflows
+                    # Remove original filename entry and add the actual file path
+                    original_content = file_contents.get(file.filename, content)
+                    if file.filename in file_contents:
+                        del file_contents[file.filename]  # Remove entry with original filename
+                    file_contents[tmp_file_path] = original_content
+                    
+                except Exception as e:
+                    logger.error(f"Failed to save {file.filename} to /tmp: {e}")
+
         # Use questions as task description (content of questions.txt)
         task_description = questions_text
 
-        # Intelligent workflow type detection using LLM
+        # Intelligent workflow type detection using LLM (enhanced with file info)
         detected_workflow = await detect_workflow_type_llm(task_description, "multi_step_web_scraping")
+        
+        # If LLM detection fails or returns generic result, try fallback with file info
+        if detected_workflow in ["data_analysis", "multi_step_web_scraping"] and file_contents:
+            fallback_workflow = detect_workflow_type_fallback(task_description, detected_workflow, file_contents)
+            if fallback_workflow != detected_workflow:
+                detected_workflow = fallback_workflow
+                logger.info(f"Enhanced detection changed workflow to: {detected_workflow}")
         logger.info(f"Detected workflow: {detected_workflow}")
         logger.info(f"Task description: {task_description[:200]}...")
 

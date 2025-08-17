@@ -1,0 +1,9 @@
+Network Analysis Questions:
+
+1. How many edges are in the network?
+2. Which node has the highest degree?
+3. What is the average degree of the network?
+4. What is the network density?
+5. What is the length of the shortest path between Alice and Eve?
+6. Draw the network with nodes labelled and edges shown. Encode as base64 PNG.
+7. Plot the degree distribution as a bar chart with green bars. Encode as base64 PNG.

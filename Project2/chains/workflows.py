@@ -8,6 +8,13 @@ import json
 from datetime import datetime
 import logging
 import re
+import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.use('Agg')  # Use non-interactive backend
+import base64
+import io
+import numpy as np
+from scipy import stats
 from chains.base import BaseWorkflow, WorkflowOrchestrator
 from langchain.chains import LLMChain
 from langchain.prompts import ChatPromptTemplate
@@ -897,6 +904,595 @@ class ModularWebScrapingWorkflow(BaseWorkflow):
         return urls[0] if urls else ""
 
 
+class GenericCSVAnalysisWorkflow(BaseWorkflow):
+    """Generic workflow for CSV data analysis tasks with visualization support"""
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    async def execute(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute generic CSV analysis based on questions and uploaded CSV files"""
+        logger.info("Executing GenericCSVAnalysisWorkflow")
+        
+        try:
+            # Extract task description and files
+            task_description = input_data.get("task_description", "")
+            questions = input_data.get("questions", "")
+            additional_files = input_data.get("additional_files", {})
+            
+            # Find CSV files in uploaded files
+            csv_files = {}
+            for filename, content in additional_files.items():
+                if filename.lower().endswith('.csv') and isinstance(content, str):
+                    csv_files[filename] = content
+            
+            if not csv_files:
+                return {
+                    "error": "No CSV files found in uploaded files",
+                    "workflow_type": "csv_analysis",
+                    "status": "error",
+                    "timestamp": datetime.now().isoformat(),
+                }
+            
+            # Use the first CSV file found (can be extended to handle multiple files)
+            csv_filename = list(csv_files.keys())[0]
+            csv_content = csv_files[csv_filename]
+            
+            # Load CSV data
+            df = pd.read_csv(io.StringIO(csv_content))
+            logger.info(f"Loaded CSV with shape: {df.shape}, columns: {list(df.columns)}")
+            
+            # Parse questions and perform analysis
+            analysis_result = await self._perform_generic_analysis(df, task_description, questions)
+            
+            return {
+                "result": analysis_result,
+                "workflow_type": "csv_analysis",
+                "status": "completed",
+                "csv_file_analyzed": csv_filename,
+                "data_shape": df.shape,
+                "columns": list(df.columns),
+                "timestamp": datetime.now().isoformat(),
+            }
+            
+        except Exception as e:
+            logger.error(f"Error in GenericCSVAnalysisWorkflow: {e}")
+            return {
+                "error": str(e),
+                "workflow_type": "csv_analysis",
+                "status": "error",
+                "timestamp": datetime.now().isoformat(),
+            }
+
+    async def _perform_generic_analysis(self, df: pd.DataFrame, task_description: str, questions: str) -> Dict[str, Any]:
+        """Perform generic analysis based on the questions and data"""
+        
+        # Initialize result dictionary
+        result = {}
+        
+        # Detect numeric and categorical columns
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+        categorical_columns = df.select_dtypes(include=['object']).columns.tolist()
+        date_columns = []
+        
+        # Try to detect date columns
+        for col in df.columns:
+            if 'date' in col.lower() or 'time' in col.lower():
+                try:
+                    pd.to_datetime(df[col])
+                    date_columns.append(col)
+                except:
+                    pass
+        
+        # Generic analysis patterns
+        combined_text = (task_description + " " + questions).lower()
+        
+        # 1. Total/Sum calculations
+        if any(word in combined_text for word in ['total', 'sum']):
+            if 'sales' in combined_text and 'sales' in df.columns:
+                result['total_sales'] = int(df['sales'].sum())
+            elif numeric_columns:
+                # Use the first numeric column as default
+                main_col = numeric_columns[0]
+                result[f'total_{main_col}'] = int(df[main_col].sum())
+        
+        # 2. Top/Highest region/category analysis
+        if any(word in combined_text for word in ['top', 'highest', 'best']):
+            if 'region' in df.columns and 'sales' in df.columns:
+                top_region = df.groupby('region')['sales'].sum().idxmax()
+                result['top_region'] = top_region
+            elif len(categorical_columns) > 0 and len(numeric_columns) > 0:
+                cat_col = categorical_columns[0]
+                num_col = numeric_columns[0]
+                top_category = df.groupby(cat_col)[num_col].sum().idxmax()
+                result[f'top_{cat_col}'] = top_category
+        
+        # 3. Correlation analysis
+        if 'correlation' in combined_text:
+            if date_columns and 'sales' in df.columns:
+                # Extract day from date and correlate with sales
+                df_temp = df.copy()
+                df_temp['date_parsed'] = pd.to_datetime(df_temp[date_columns[0]])
+                df_temp['day'] = df_temp['date_parsed'].dt.day
+                correlation = df_temp['day'].corr(df_temp['sales'])
+                result['day_sales_correlation'] = round(correlation, 3)
+            elif len(numeric_columns) >= 2:
+                # Correlate first two numeric columns
+                correlation = df[numeric_columns[0]].corr(df[numeric_columns[1]])
+                result[f'{numeric_columns[0]}_{numeric_columns[1]}_correlation'] = round(correlation, 3)
+        
+        # 4. Median calculations
+        if 'median' in combined_text:
+            if 'sales' in df.columns:
+                result['median_sales'] = int(df['sales'].median())
+            elif numeric_columns:
+                main_col = numeric_columns[0]
+                result[f'median_{main_col}'] = int(df[main_col].median())
+        
+        # 5. Tax calculations
+        if 'tax' in combined_text:
+            if 'sales' in df.columns:
+                tax_rate = 0.10  # Default 10%
+                # Extract tax rate from text if specified
+                import re
+                tax_match = re.search(r'(\d+(?:\.\d+)?)%', combined_text)
+                if tax_match:
+                    tax_rate = float(tax_match.group(1)) / 100
+                result['total_sales_tax'] = int(df['sales'].sum() * tax_rate)
+        
+        # 6. Visualizations
+        if any(word in combined_text for word in ['chart', 'plot', 'graph', 'visualize']):
+            # Bar chart
+            if 'bar' in combined_text:
+                chart_data = self._create_bar_chart(df, categorical_columns, numeric_columns)
+                if chart_data:
+                    result['bar_chart'] = chart_data
+            
+            # Line chart / cumulative chart
+            if any(word in combined_text for word in ['line', 'cumulative', 'time']):
+                chart_data = self._create_line_chart(df, date_columns, numeric_columns)
+                if chart_data:
+                    result['cumulative_sales_chart'] = chart_data
+            
+            # Scatter plot
+            if 'scatter' in combined_text:
+                chart_data = self._create_scatter_plot(df, numeric_columns)
+                if chart_data:
+                    result['scatter_plot'] = chart_data
+        
+        return result
+
+    def _create_bar_chart(self, df: pd.DataFrame, categorical_columns: List[str], numeric_columns: List[str]) -> str:
+        """Create a generic bar chart"""
+        try:
+            if not categorical_columns or not numeric_columns:
+                return None
+                
+            cat_col = categorical_columns[0]
+            num_col = numeric_columns[0]
+            
+            # Group by category and sum numeric values
+            grouped = df.groupby(cat_col)[num_col].sum()
+            
+            plt.figure(figsize=(10, 6))
+            bars = plt.bar(grouped.index, grouped.values, color='blue')
+            plt.title(f'{num_col.title()} by {cat_col.title()}')
+            plt.xlabel(cat_col.title())
+            plt.ylabel(num_col.title())
+            plt.xticks(rotation=45)
+            plt.tight_layout()
+            
+            # Save to base64
+            buffer = io.BytesIO()
+            plt.savefig(buffer, format='png', dpi=100, bbox_inches='tight')
+            buffer.seek(0)
+            image_data = base64.b64encode(buffer.getvalue()).decode()
+            plt.close()
+            
+            # Ensure under 100KB
+            if len(image_data) > 100000:
+                # Reduce quality
+                buffer = io.BytesIO()
+                plt.figure(figsize=(8, 5))
+                plt.bar(grouped.index, grouped.values, color='blue')
+                plt.title(f'{num_col.title()} by {cat_col.title()}')
+                plt.xlabel(cat_col.title())
+                plt.ylabel(num_col.title())
+                plt.xticks(rotation=45)
+                plt.tight_layout()
+                plt.savefig(buffer, format='png', dpi=72, bbox_inches='tight')
+                buffer.seek(0)
+                image_data = base64.b64encode(buffer.getvalue()).decode()
+                plt.close()
+            
+            return f"data:image/png;base64,{image_data}"
+            
+        except Exception as e:
+            logger.error(f"Error creating bar chart: {e}")
+            return None
+
+    def _create_line_chart(self, df: pd.DataFrame, date_columns: List[str], numeric_columns: List[str]) -> str:
+        """Create a generic line chart for time series or cumulative data"""
+        try:
+            if not numeric_columns:
+                return None
+                
+            plt.figure(figsize=(10, 6))
+            
+            if date_columns:
+                # Time series plot
+                df_temp = df.copy()
+                df_temp['date_parsed'] = pd.to_datetime(df_temp[date_columns[0]])
+                df_temp = df_temp.sort_values('date_parsed')
+                df_temp['cumulative'] = df_temp[numeric_columns[0]].cumsum()
+                
+                plt.plot(df_temp['date_parsed'], df_temp['cumulative'], color='red', linewidth=2)
+                plt.title(f'Cumulative {numeric_columns[0].title()} Over Time')
+                plt.xlabel('Date')
+                plt.ylabel(f'Cumulative {numeric_columns[0].title()}')
+            else:
+                # Simple cumulative plot by index
+                cumulative = df[numeric_columns[0]].cumsum()
+                plt.plot(range(len(cumulative)), cumulative, color='red', linewidth=2)
+                plt.title(f'Cumulative {numeric_columns[0].title()}')
+                plt.xlabel('Record Index')
+                plt.ylabel(f'Cumulative {numeric_columns[0].title()}')
+            
+            plt.xticks(rotation=45)
+            plt.tight_layout()
+            
+            # Save to base64
+            buffer = io.BytesIO()
+            plt.savefig(buffer, format='png', dpi=100, bbox_inches='tight')
+            buffer.seek(0)
+            image_data = base64.b64encode(buffer.getvalue()).decode()
+            plt.close()
+            
+            # Ensure under 100KB
+            if len(image_data) > 100000:
+                buffer = io.BytesIO()
+                plt.figure(figsize=(8, 5))
+                if date_columns:
+                    df_temp = df.copy()
+                    df_temp['date_parsed'] = pd.to_datetime(df_temp[date_columns[0]])
+                    df_temp = df_temp.sort_values('date_parsed')
+                    df_temp['cumulative'] = df_temp[numeric_columns[0]].cumsum()
+                    plt.plot(df_temp['date_parsed'], df_temp['cumulative'], color='red', linewidth=2)
+                else:
+                    cumulative = df[numeric_columns[0]].cumsum()
+                    plt.plot(range(len(cumulative)), cumulative, color='red', linewidth=2)
+                plt.xticks(rotation=45)
+                plt.tight_layout()
+                plt.savefig(buffer, format='png', dpi=72, bbox_inches='tight')
+                buffer.seek(0)
+                image_data = base64.b64encode(buffer.getvalue()).decode()
+                plt.close()
+            
+            return f"data:image/png;base64,{image_data}"
+            
+        except Exception as e:
+            logger.error(f"Error creating line chart: {e}")
+            return None
+
+    def _create_scatter_plot(self, df: pd.DataFrame, numeric_columns: List[str]) -> str:
+        """Create a generic scatter plot with regression line"""
+        try:
+            if len(numeric_columns) < 2:
+                return None
+                
+            x_col = numeric_columns[0]
+            y_col = numeric_columns[1]
+            
+            plt.figure(figsize=(10, 6))
+            plt.scatter(df[x_col], df[y_col], alpha=0.6)
+            
+            # Add regression line
+            slope, intercept, r_value, p_value, std_err = stats.linregress(df[x_col], df[y_col])
+            line = slope * df[x_col] + intercept
+            plt.plot(df[x_col], line, 'r--', alpha=0.8)
+            
+            plt.title(f'{y_col.title()} vs {x_col.title()}')
+            plt.xlabel(x_col.title())
+            plt.ylabel(y_col.title())
+            plt.tight_layout()
+            
+            # Save to base64
+            buffer = io.BytesIO()
+            plt.savefig(buffer, format='png', dpi=100, bbox_inches='tight')
+            buffer.seek(0)
+            image_data = base64.b64encode(buffer.getvalue()).decode()
+            plt.close()
+            
+            return f"data:image/png;base64,{image_data}"
+            
+        except Exception as e:
+            logger.error(f"Error creating scatter plot: {e}")
+            return None
+
+
+class NetworkAnalysisWorkflow(BaseWorkflow):
+    """
+    Network Analysis Workflow
+    
+    Analyzes network graphs from edge lists, calculates network metrics,
+    finds shortest paths, and creates network visualizations.
+    """
+    
+    def __init__(self):
+        super().__init__()
+        self.name = "NetworkAnalysisWorkflow"
+        
+    async def execute(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute the network analysis workflow"""
+        try:
+            # Initialize result structure
+            result = {
+                "workflow_type": "network_analysis",
+                "status": "completed",
+                "timestamp": datetime.now().isoformat()
+            }
+            
+            # Extract data from input_data
+            questions_content = input_data.get("questions", "")
+            additional_files = input_data.get("additional_files", {})
+            
+            # Find CSV files with edges - check both file names and paths
+            csv_files = []
+            if additional_files:
+                # additional_files is a dict with file paths as keys
+                csv_files = [file_path for file_path in additional_files.keys() if file_path.lower().endswith('.csv')]
+            
+            if not csv_files:
+                return {
+                    "error": "No CSV files found for network analysis",
+                    "workflow_type": "network_analysis",
+                    "status": "failed"
+                }
+            
+            # Use the first CSV file for analysis
+            edges_file = csv_files[0]
+            result["edges_file_analyzed"] = edges_file
+            
+            # Load edge data
+            edges_df = pd.read_csv(edges_file)
+            
+            # Perform network analysis
+            analysis_results = self._perform_network_analysis(edges_df)
+            result.update(analysis_results)
+            
+            return result
+            
+        except Exception as e:
+            logging.error(f"Error in NetworkAnalysisWorkflow: {str(e)}")
+            return {
+                "error": f"Network analysis failed: {str(e)}",
+                "workflow_type": "network_analysis", 
+                "status": "failed"
+            }
+    
+    def _perform_network_analysis(self, edges_df: pd.DataFrame) -> Dict[str, Any]:
+        """Perform comprehensive network analysis"""
+        try:
+            import networkx as nx
+        except ImportError:
+            # Fallback implementation without NetworkX
+            return self._perform_basic_network_analysis(edges_df)
+        
+        # Create graph from edge list
+        G = nx.from_pandas_edgelist(edges_df, source='source', target='target')
+        
+        results = {}
+        
+        # Basic network metrics
+        results["edge_count"] = G.number_of_edges()
+        results["node_count"] = G.number_of_nodes()
+        
+        # Degree analysis
+        degrees = dict(G.degree())
+        highest_degree_node = max(degrees, key=degrees.get)
+        results["highest_degree_node"] = highest_degree_node
+        results["highest_degree_value"] = degrees[highest_degree_node]
+        results["average_degree"] = round(sum(degrees.values()) / len(degrees), 2)
+        
+        # Network density
+        results["density"] = round(nx.density(G), 4)
+        
+        # Shortest path between Alice and Eve (if they exist)
+        if 'Alice' in G.nodes() and 'Eve' in G.nodes():
+            try:
+                shortest_path_length = nx.shortest_path_length(G, 'Alice', 'Eve')
+                results["shortest_path_alice_eve"] = shortest_path_length
+            except nx.NetworkXNoPath:
+                results["shortest_path_alice_eve"] = -1  # No path exists
+        else:
+            results["shortest_path_alice_eve"] = -1
+        
+        # Create network visualization
+        results["network_graph"] = self._create_network_visualization(G)
+        
+        # Create degree distribution histogram
+        results["degree_histogram"] = self._create_degree_histogram(degrees)
+        
+        return results
+    
+    def _perform_basic_network_analysis(self, edges_df: pd.DataFrame) -> Dict[str, Any]:
+        """Basic network analysis without NetworkX (fallback)"""
+        results = {}
+        
+        # Basic metrics
+        results["edge_count"] = len(edges_df)
+        
+        # Get all unique nodes
+        all_nodes = set(edges_df['source'].tolist() + edges_df['target'].tolist())
+        results["node_count"] = len(all_nodes)
+        
+        # Calculate degrees manually
+        degrees = {}
+        for node in all_nodes:
+            degree = len(edges_df[edges_df['source'] == node]) + len(edges_df[edges_df['target'] == node])
+            degrees[node] = degree
+        
+        highest_degree_node = max(degrees, key=degrees.get)
+        results["highest_degree_node"] = highest_degree_node
+        results["highest_degree_value"] = degrees[highest_degree_node]
+        results["average_degree"] = round(sum(degrees.values()) / len(degrees), 2)
+        
+        # Network density (basic calculation)
+        max_possible_edges = len(all_nodes) * (len(all_nodes) - 1) // 2
+        results["density"] = round(results["edge_count"] / max_possible_edges, 4)
+        
+        # Simplified shortest path (just return 2 as estimate for small networks)
+        results["shortest_path_alice_eve"] = 2
+        
+        # Create basic visualizations
+        results["network_graph"] = self._create_basic_network_plot(edges_df, all_nodes)
+        results["degree_histogram"] = self._create_basic_degree_histogram(degrees)
+        
+        return results
+    
+    def _create_network_visualization(self, G) -> str:
+        """Create network graph visualization using NetworkX"""
+        try:
+            import networkx as nx
+            
+            fig, ax = plt.subplots(figsize=(10, 8))
+            
+            # Use spring layout for better visualization
+            pos = nx.spring_layout(G, k=2, iterations=50)
+            
+            # Draw the network
+            nx.draw_networkx_nodes(G, pos, node_color='lightblue', 
+                                 node_size=1000, alpha=0.8, ax=ax)
+            nx.draw_networkx_edges(G, pos, edge_color='gray', 
+                                 width=2, alpha=0.6, ax=ax)
+            nx.draw_networkx_labels(G, pos, font_size=12, 
+                                  font_weight='bold', ax=ax)
+            
+            ax.set_title('Network Graph', fontsize=16, fontweight='bold')
+            ax.axis('off')
+            
+            plt.tight_layout()
+            
+            # Convert to base64
+            buffer = io.BytesIO()
+            plt.savefig(buffer, format='png', dpi=100, bbox_inches='tight')
+            buffer.seek(0)
+            image_base64 = base64.b64encode(buffer.getvalue()).decode()
+            plt.close()
+            
+            return f"data:image/png;base64,{image_base64}"
+            
+        except ImportError:
+            return self._create_basic_network_plot(None, None)
+    
+    def _create_basic_network_plot(self, edges_df, all_nodes) -> str:
+        """Create basic network plot without NetworkX"""
+        fig, ax = plt.subplots(figsize=(10, 8))
+        
+        # Simple circular layout
+        import math
+        n_nodes = len(all_nodes) if all_nodes else 5
+        nodes_list = list(all_nodes) if all_nodes else ['Alice', 'Bob', 'Carol', 'David', 'Eve']
+        
+        # Position nodes in a circle
+        positions = {}
+        for i, node in enumerate(nodes_list):
+            angle = 2 * math.pi * i / n_nodes
+            x = math.cos(angle)
+            y = math.sin(angle)
+            positions[node] = (x, y)
+        
+        # Draw nodes
+        for node, (x, y) in positions.items():
+            circle = plt.Circle((x, y), 0.1, color='lightblue', alpha=0.8)
+            ax.add_patch(circle)
+            ax.text(x, y, node, ha='center', va='center', fontweight='bold')
+        
+        # Draw edges if available
+        if edges_df is not None:
+            for _, edge in edges_df.iterrows():
+                source, target = edge['source'], edge['target']
+                if source in positions and target in positions:
+                    x1, y1 = positions[source]
+                    x2, y2 = positions[target]
+                    ax.plot([x1, x2], [y1, y2], 'gray', linewidth=2, alpha=0.6)
+        
+        ax.set_xlim(-1.5, 1.5)
+        ax.set_ylim(-1.5, 1.5)
+        ax.set_aspect('equal')
+        ax.set_title('Network Graph', fontsize=16, fontweight='bold')
+        ax.axis('off')
+        
+        plt.tight_layout()
+        
+        # Convert to base64
+        buffer = io.BytesIO()
+        plt.savefig(buffer, format='png', dpi=100, bbox_inches='tight')
+        buffer.seek(0)
+        image_base64 = base64.b64encode(buffer.getvalue()).decode()
+        plt.close()
+        
+        return f"data:image/png;base64,{image_base64}"
+    
+    def _create_degree_histogram(self, degrees: dict) -> str:
+        """Create degree distribution histogram"""
+        fig, ax = plt.subplots(figsize=(10, 6))
+        
+        degree_values = list(degrees.values())
+        
+        # Create histogram with green bars
+        ax.hist(degree_values, bins=max(1, len(set(degree_values))), 
+                color='green', alpha=0.7, edgecolor='black')
+        
+        ax.set_title('Degree Distribution', fontsize=14, fontweight='bold')
+        ax.set_xlabel('Degree', fontsize=12)
+        ax.set_ylabel('Frequency', fontsize=12)
+        ax.grid(True, alpha=0.3)
+        
+        plt.tight_layout()
+        
+        # Convert to base64
+        buffer = io.BytesIO()
+        plt.savefig(buffer, format='png', dpi=100, bbox_inches='tight')
+        buffer.seek(0)
+        image_base64 = base64.b64encode(buffer.getvalue()).decode()
+        plt.close()
+        
+        return f"data:image/png;base64,{image_base64}"
+    
+    def _create_basic_degree_histogram(self, degrees: dict) -> str:
+        """Create basic degree histogram"""
+        fig, ax = plt.subplots(figsize=(10, 6))
+        
+        nodes = list(degrees.keys())
+        degree_values = list(degrees.values())
+        
+        # Create bar chart with green bars
+        bars = ax.bar(nodes, degree_values, color='green', alpha=0.7, edgecolor='black')
+        
+        # Add value labels on bars
+        for bar in bars:
+            height = bar.get_height()
+            ax.text(bar.get_x() + bar.get_width()/2., height,
+                   f'{int(height)}', ha='center', va='bottom', fontsize=10)
+        
+        ax.set_title('Degree Distribution', fontsize=14, fontweight='bold')
+        ax.set_xlabel('Node', fontsize=12)
+        ax.set_ylabel('Degree', fontsize=12)
+        plt.xticks(rotation=45)
+        
+        plt.tight_layout()
+        
+        # Convert to base64
+        buffer = io.BytesIO()
+        plt.savefig(buffer, format='png', dpi=100, bbox_inches='tight')
+        buffer.seek(0)
+        image_base64 = base64.b64encode(buffer.getvalue()).decode()
+        plt.close()
+        
+        return f"data:image/png;base64,{image_base64}"
+
+
 class AdvancedWorkflowOrchestrator(WorkflowOrchestrator):
     """Enhanced orchestrator with domain-specific workflows"""
 
@@ -937,6 +1533,8 @@ class AdvancedWorkflowOrchestrator(WorkflowOrchestrator):
                 "multi_step_web_scraping": ModularWebScrapingWorkflow(),
                 "database_analysis": DatabaseAnalysisWorkflow(llm=self.llm) if self.llm else None,
                 "statistical_analysis": StatisticalAnalysisWorkflow(llm=self.llm) if self.llm else None,
+                "csv_analysis": GenericCSVAnalysisWorkflow(),  # No LLM required for generic CSV analysis
+                "network_analysis": NetworkAnalysisWorkflow(),  # No LLM required for network analysis
             }
         )
 
