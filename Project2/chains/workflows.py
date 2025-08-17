@@ -1529,27 +1529,29 @@ class NetworkAnalysisWorkflow(BaseWorkflow):
         try:
             import networkx as nx
             
-            fig, ax = plt.subplots(figsize=(10, 8))
+            # Smaller figure size to reduce image file size
+            fig, ax = plt.subplots(figsize=(8, 6))
             
             # Use spring layout for better visualization
             pos = nx.spring_layout(G, k=2, iterations=50)
             
             # Draw the network
             nx.draw_networkx_nodes(G, pos, node_color='lightblue', 
-                                 node_size=1000, alpha=0.8, ax=ax)
+                                 node_size=800, alpha=0.8, ax=ax)
             nx.draw_networkx_edges(G, pos, edge_color='gray', 
                                  width=2, alpha=0.6, ax=ax)
-            nx.draw_networkx_labels(G, pos, font_size=12, 
+            nx.draw_networkx_labels(G, pos, font_size=10, 
                                   font_weight='bold', ax=ax)
             
-            ax.set_title('Network Graph', fontsize=16, fontweight='bold')
+            ax.set_title('Network Graph', fontsize=14, fontweight='bold')
             ax.axis('off')
             
             plt.tight_layout()
             
-            # Convert to base64
+            # Convert to base64 with lower DPI to reduce file size
             buffer = io.BytesIO()
-            plt.savefig(buffer, format='png', dpi=100, bbox_inches='tight')
+            plt.savefig(buffer, format='png', dpi=72, bbox_inches='tight', 
+                       optimize=True, facecolor='white')
             buffer.seek(0)
             image_base64 = base64.b64encode(buffer.getvalue()).decode()
             plt.close()
@@ -1561,7 +1563,8 @@ class NetworkAnalysisWorkflow(BaseWorkflow):
     
     def _create_basic_network_plot(self, edges_df, all_nodes) -> str:
         """Create basic network plot without NetworkX"""
-        fig, ax = plt.subplots(figsize=(10, 8))
+        # Smaller figure size to reduce image file size
+        fig, ax = plt.subplots(figsize=(8, 6))
         
         # Simple circular layout
         import math
@@ -1580,7 +1583,7 @@ class NetworkAnalysisWorkflow(BaseWorkflow):
         for node, (x, y) in positions.items():
             circle = plt.Circle((x, y), 0.1, color='lightblue', alpha=0.8)
             ax.add_patch(circle)
-            ax.text(x, y, node, ha='center', va='center', fontweight='bold')
+            ax.text(x, y, node, ha='center', va='center', fontweight='bold', fontsize=9)
         
         # Draw edges if available
         if edges_df is not None:
@@ -1594,14 +1597,15 @@ class NetworkAnalysisWorkflow(BaseWorkflow):
         ax.set_xlim(-1.5, 1.5)
         ax.set_ylim(-1.5, 1.5)
         ax.set_aspect('equal')
-        ax.set_title('Network Graph', fontsize=16, fontweight='bold')
+        ax.set_title('Network Graph', fontsize=14, fontweight='bold')
         ax.axis('off')
         
         plt.tight_layout()
         
-        # Convert to base64
+        # Convert to base64 with lower DPI to reduce file size
         buffer = io.BytesIO()
-        plt.savefig(buffer, format='png', dpi=100, bbox_inches='tight')
+        plt.savefig(buffer, format='png', dpi=72, bbox_inches='tight', 
+                   optimize=True, facecolor='white')
         buffer.seek(0)
         image_base64 = base64.b64encode(buffer.getvalue()).decode()
         plt.close()
@@ -1609,25 +1613,35 @@ class NetworkAnalysisWorkflow(BaseWorkflow):
         return f"data:image/png;base64,{image_base64}"
     
     def _create_degree_histogram(self, degrees: dict) -> str:
-        """Create degree distribution histogram"""
-        fig, ax = plt.subplots(figsize=(10, 6))
+        """Create degree distribution as a bar chart with green bars"""
+        # Smaller figure size to reduce image file size
+        fig, ax = plt.subplots(figsize=(8, 5))
         
+        # Create bar chart instead of histogram for clearer visualization
+        nodes = list(degrees.keys())
         degree_values = list(degrees.values())
         
-        # Create histogram with green bars
-        ax.hist(degree_values, bins=max(1, len(set(degree_values))), 
-                color='green', alpha=0.7, edgecolor='black')
+        # Create bar chart with green bars
+        bars = ax.bar(nodes, degree_values, color='green', alpha=0.7, edgecolor='black')
         
-        ax.set_title('Degree Distribution', fontsize=14, fontweight='bold')
-        ax.set_xlabel('Degree', fontsize=12)
-        ax.set_ylabel('Frequency', fontsize=12)
+        # Add value labels on bars
+        for bar in bars:
+            height = bar.get_height()
+            ax.text(bar.get_x() + bar.get_width()/2., height,
+                   f'{int(height)}', ha='center', va='bottom', fontsize=9)
+        
+        ax.set_title('Degree Distribution', fontsize=12, fontweight='bold')
+        ax.set_xlabel('Node', fontsize=10)
+        ax.set_ylabel('Degree', fontsize=10)
+        plt.xticks(rotation=45, fontsize=9)
         ax.grid(True, alpha=0.3)
         
         plt.tight_layout()
         
-        # Convert to base64
+        # Convert to base64 with lower DPI to reduce file size
         buffer = io.BytesIO()
-        plt.savefig(buffer, format='png', dpi=100, bbox_inches='tight')
+        plt.savefig(buffer, format='png', dpi=72, bbox_inches='tight', 
+                   optimize=True, facecolor='white')
         buffer.seek(0)
         image_base64 = base64.b64encode(buffer.getvalue()).decode()
         plt.close()
