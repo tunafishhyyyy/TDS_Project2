@@ -1,5 +1,6 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse
 from typing import Optional
 import uuid
 import asyncio
@@ -11,6 +12,11 @@ import sys
 import logging
 import os
 from utils.prompts import WORKFLOW_DETECTION_SYSTEM_PROMPT, WORKFLOW_DETECTION_HUMAN_PROMPT
+
+async def analyze_data(
+    request: Request,
+    questions_txt: UploadFile = File(..., alias="questions.txt")
+):ETECTION_HUMAN_PROMPT
 from utils.constants import (
     VALID_WORKFLOWS, API_TITLE, API_DESCRIPTION, API_VERSION, API_FEATURES,
     API_ENDPOINTS, STATUS_OPERATIONAL, STATUS_HEALTHY, STATUS_AVAILABLE,
@@ -215,74 +221,45 @@ async def detect_workflow_type_llm(
 
 
 def detect_workflow_type_fallback(
-    task_description: str, default_workflow: str = DEFAULT_WORKFLOW, additional_files: Dict[str, Any] = None
-) -> str:  # Fallback keyword-based workflow detection
+    task_description: str, default_workflow: str = "multi_step_web_scraping", additional_files: dict = None
+) -> str:  # Fallback workflow detection using keywords
     """
-    Fallback keyword-based workflow detection when LLM is not available
+    Fallback keyword-based workflow detection enhanced with file information
     """
     if not task_description:
         return default_workflow
+    
+    logger.info(f"Starting fallback workflow detection for task: {task_description[:200]}...")
+    logger.info(f"Additional files provided: {list(additional_files.keys()) if additional_files else 'None'}")
 
     task_lower = task_description.lower()
-    
-    # Check if CSV files are uploaded - strong indicator for CSV analysis
+
+    # Enhanced CSV file detection
     if additional_files:
         csv_files = [f for f in additional_files.keys() if f.lower().endswith('.csv')]
+        logger.info(f"Found CSV files: {csv_files}")
+        
         if csv_files:
-            # Check if it's network analysis (edges.csv or network-related keywords)
-            network_file_check = any('edge' in f.lower() for f in csv_files)
+            # Check if it's network analysis based on specific file patterns
+            network_file_check = any('edge' in f.lower() or 'node' in f.lower() or 'graph' in f.lower() for f in csv_files)
+            logger.info(f"Network file check: {network_file_check}")
+            
+            # If CSV files are present and task mentions analysis keywords, prioritize CSV analysis
+            analysis_keywords = ['analyze', 'analysis', 'total', 'sales', 'median', 'correlation', 'chart', 'plot']
+            analysis_keyword_match = any(keyword in task_lower for keyword in analysis_keywords)
+            logger.info(f"CSV analysis keyword match: {analysis_keyword_match}")
+            
+            # Only use network analysis if specific network files OR (network keywords AND no general analysis keywords)
             network_keyword_check = any(keyword in task_lower for keyword in NETWORK_ANALYSIS_KEYWORDS)
-            if network_file_check or network_keyword_check:
+            logger.info(f"Network analysis checks - file: {network_file_check}, keywords: {network_keyword_check}")
+            
+            if network_file_check or (network_keyword_check and not analysis_keyword_match):
+                logger.info("Detected network analysis workflow")
                 return "network_analysis"
             
-            # If CSV files are present and task mentions analysis keywords, use CSV analysis
-            analysis_keywords = ['analyze', 'analysis', 'total', 'sales', 'median', 'correlation', 'chart', 'plot']
-            if any(keyword in task_lower for keyword in analysis_keywords):
+            if analysis_keyword_match:
+                logger.info("Detected CSV analysis workflow")
                 return "csv_analysis"
-
-    # DuckDB/database detection (priority)
-    duckdb_keywords = ["duckdb", "parquet", "s3://", "bucket", "sql", "select count(*)", "read_parquet"]
-    if any(keyword in task_lower for keyword in duckdb_keywords):
-        return "database_analysis"
-
-    # Database analysis patterns
-    if any(keyword in task_lower for keyword in DB_KEYWORDS):
-        return "database_analysis"
-
-    # Network analysis patterns
-    if any(keyword in task_lower for keyword in NETWORK_ANALYSIS_KEYWORDS):
-        return "network_analysis"
-
-    # CSV analysis patterns (check before general data analysis)
-    if any(keyword in task_lower for keyword in CSV_ANALYSIS_KEYWORDS):
-        return "csv_analysis"
-
-    # Web scraping patterns
-    if any(keyword in task_lower for keyword in SCRAPING_KEYWORDS):
-        if any(keyword in task_lower for keyword in MULTI_STEP_KEYWORDS):
-            return "multi_step_web_scraping"
-        else:
-            return "multi_step_web_scraping"
-
-    if any(keyword in task_lower for keyword in IMAGE_KEYWORDS):
-        return "image_analysis"
-    if any(keyword in task_lower for keyword in TEXT_KEYWORDS):
-        return "text_analysis"
-    if any(keyword in task_lower for keyword in LEGAL_KEYWORDS):
-        return "data_analysis"
-    if any(keyword in task_lower for keyword in STATS_KEYWORDS):
-        return "statistical_analysis"
-    if any(keyword in task_lower for keyword in VIZ_KEYWORDS):
-        return "data_visualization"
-    if any(keyword in task_lower for keyword in EDA_KEYWORDS):
-        return "exploratory_data_analysis"
-    if any(keyword in task_lower for keyword in ML_KEYWORDS):
-        return "predictive_modeling"
-    if any(keyword in task_lower for keyword in CODE_KEYWORDS):
-        return "code_generation"
-    if any(keyword in task_lower for keyword in WEB_KEYWORDS):
-        return "multi_step_web_scraping"
-    return default_workflow
 
 
 def prepare_workflow_parameters(
@@ -343,175 +320,242 @@ def prepare_workflow_parameters(
     return params
 
 
+def save_questions_file(filename: str, content: bytes) -> str:
+    """Save questions file to temporary directory"""
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    base_name = filename.replace(".txt", "")
+    temp_filename = f"{base_name}_{timestamp}.txt"
+    temp_path = os.path.join("/tmp", temp_filename)
+    
+    with open(temp_path, "wb") as f:
+        f.write(content)
+    
+    return temp_path
+
+def save_csv_file(filename: str, content: bytes) -> str:
+    """Save CSV file to temporary directory"""
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    base_name = filename.replace(".csv", "")
+    temp_filename = f"{base_name}_{timestamp}.csv"
+    temp_path = os.path.join("/tmp", temp_filename)
+    
+    with open(temp_path, "wb") as f:
+        f.write(content)
+    
+    return temp_path
+
+def save_other_file(filename: str, content: bytes) -> str:
+    """Save other file types to temporary directory"""
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    name, ext = os.path.splitext(filename)
+    temp_filename = f"{name}_{timestamp}{ext}"
+    temp_path = os.path.join("/tmp", temp_filename)
+    
+    with open(temp_path, "wb") as f:
+        f.write(content)
+    
+    return temp_path
+
+
+def detect_workflow_type(task_description: str, additional_files: dict = None) -> str:
+    """Detect workflow type using LLM and fallback methods"""
+    logger.info("Starting LLM-based workflow detection...")
+    logger.info(f"Additional files provided to detect_workflow_type: {list(additional_files.keys()) if additional_files else 'None'}")
+    
+    # First try LLM detection
+    try:
+        import asyncio
+        if hasattr(asyncio, '_get_running_loop') and asyncio._get_running_loop():
+            # We're in an async context, but need to call sync function
+            loop = asyncio.get_event_loop()
+            llm_result = loop.run_until_complete(detect_workflow_type_llm(task_description))
+        else:
+            # Not in async context
+            llm_result = asyncio.run(detect_workflow_type_llm(task_description))
+        logger.info(f"LLM detected workflow type: {llm_result}")
+        logger.info(f"LLM detected workflow: {llm_result}")
+        
+        # Apply fallback detection with file info
+        logger.info("Applying fallback workflow detection with file info...")
+        enhanced_result = detect_workflow_type_fallback(task_description, llm_result, additional_files or {})
+        logger.info(f"Enhanced detection changed workflow to: {enhanced_result}")
+        logger.info(f"Final detected workflow: {enhanced_result}")
+        
+        return enhanced_result
+        
+    except Exception as e:
+        logger.warning(f"LLM workflow detection failed: {e}, using fallback")
+        fallback_result = detect_workflow_type_fallback(task_description, "data_analysis", additional_files or {})
+        logger.info(f"Fallback detected workflow: {fallback_result}")
+        return fallback_result
+
+def prepare_workflow_input(
+    task_description: str,
+    questions: str,
+    additional_files: Dict[str, Any],
+    workflow_type: str,
+    file_content: str
+) -> Dict[str, Any]:
+    """Prepare input for workflow execution"""
+    
+    # Extract basic parameters
+    parameters = {
+        "file_content_length": len(file_content) if file_content else 0,
+        "content_type": "text/plain",
+        "output_format": "base64_data_uri",
+        "max_size": 100000
+    }
+    
+    workflow_input = {
+        "task_description": task_description,
+        "questions": questions,
+        "additional_files": additional_files,
+        "processed_files_info": {},
+        "workflow_type": workflow_type,
+        "parameters": parameters,
+        "output_requirements": {
+            "format": "json",
+            "include_charts": True,
+            "max_chart_size": 100000  # 100KB
+        }
+    }
+    
+    return workflow_input
+
+
 @app.post("/api/")
 async def analyze_data(
-    questions_txt: UploadFile = File(..., alias="questions.txt", description="Required questions.txt file (must contain 'question' in filename)"),
-    files: List[UploadFile] = File(default=[], description="Optional additional files (CSV, images, etc.)"),
+    request: Request,
+    questions_txt: UploadFile = File(..., alias="questions.txt")
 ):
-    """
-    Main endpoint that accepts multiple file uploads with required questions.txt.
-    All processing is synchronous and returns results immediately.
-
-    - **questions_txt**: Required questions.txt file containing the questions
-      (must contain 'question' in filename)
-    - **files**: Optional additional files (images, CSV, JSON, etc.)
-    """
-    try:  # Main API endpoint for data analysis
-        task_id = str(uuid.uuid4())
-        logger.info(f"Starting synchronous task {task_id}")
-
-        # Process required questions.txt file
-
-        # Validate required questions.txt file
-        if not (questions_txt.filename.lower().endswith(".txt") or "question" in questions_txt.filename.lower()):
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    "questions.txt file is required and must be named "
-                    "appropriately (must contain 'question' in filename)"
-                ),
-            )
-
-        questions_content = await questions_txt.read()
-        questions_text = questions_content.decode("utf-8")
-        logger.info(f"Processed questions.txt with {len(questions_text)} characters")
-
-        # Save questions.txt to /tmp with timestamp
-        timestamp_str = datetime.now().strftime("%Y%m%d%H%M%S")
-        questions_save_name = f"{os.path.splitext(questions_txt.filename)[0]}_{timestamp_str}{os.path.splitext(questions_txt.filename)[1]}"
-        tmp_questions_path = os.path.join("/tmp", questions_save_name)
-        try:
-            with open(tmp_questions_path, "wb") as f:
-                f.write(questions_content)
-            logger.info(f"Saved questions.txt to {tmp_questions_path}")
-        except Exception as e:
-            logger.error(f"Failed to save questions.txt to /tmp: {e}")
-
-        # Process additional files (CSV, images, etc.)
-        processed_files = {}
-        file_contents = {}
-
-        for file in files:
-            if file.filename:
-                content = await file.read()
-                # Handle CSV files
-                if file.filename.lower().endswith(".csv"):
-                    try:
-                        file_text = content.decode("utf-8")
-                        file_contents[file.filename] = file_text
-                        logger.info(f"Processed CSV file: {file.filename}")
-                    except UnicodeDecodeError:
-                        file_contents[file.filename] = f"Binary CSV file: {file.filename} ({len(content)} bytes)"
-                        logger.info(f"Processed binary CSV file: {file.filename} ({len(content)} bytes)")
-                # Handle image files
-                elif file.filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp')):
-                    file_contents[file.filename] = content  # Store raw bytes for images
-                    logger.info(f"Processed image file: {file.filename} ({len(content)} bytes)")
-                # Handle other text files
-                else:
-                    try:
-                        file_text = content.decode("utf-8")
-                        file_contents[file.filename] = file_text
-                        logger.info(f"Processed text file: {file.filename}")
-                    except UnicodeDecodeError:
-                        file_contents[file.filename] = f"Binary file: {file.filename} ({len(content)} bytes)"
-                        logger.info(f"Processed binary file: {file.filename} ({len(content)} bytes)")
-
-                processed_files[file.filename] = {
-                    "content_type": file.content_type,
-                    "size": len(content),
-                    "is_text": file.filename.endswith((".txt", ".csv", ".json", ".md")),
-                    "is_image": file.filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp')),
-                }
-
-                # Save each uploaded file to /tmp with timestamp
-                file_save_name = f"{os.path.splitext(file.filename)[0]}_{timestamp_str}{os.path.splitext(file.filename)[1]}"
-                tmp_file_path = os.path.join("/tmp", file_save_name)
-                try:
-                    with open(tmp_file_path, "wb") as f:
-                        f.write(content)
-                    logger.info(f"Saved {file.filename} to {tmp_file_path}")
-                    
-                    # Store the actual saved file path in file_contents for workflows
-                    # Remove original filename entry and add the actual file path
-                    original_content = file_contents.get(file.filename, content)
-                    if file.filename in file_contents:
-                        del file_contents[file.filename]  # Remove entry with original filename
-                    file_contents[tmp_file_path] = original_content
-                    
-                except Exception as e:
-                    logger.error(f"Failed to save {file.filename} to /tmp: {e}")
-
-        # Use questions as task description (content of questions.txt)
-        task_description = questions_text
-
-        # Intelligent workflow type detection using LLM (enhanced with file info)
-        detected_workflow = await detect_workflow_type_llm(task_description, "multi_step_web_scraping")
+    """Main API endpoint for data analysis workflows."""
+    task_id = str(uuid.uuid4())
+    logger.info(f"Starting synchronous task {task_id}")
+    
+    try:
+        # Log ALL request information
+        logger.info(f"=== FULL REQUEST DEBUG INFO ===")
+        logger.info(f"Request method: {request.method}")
+        logger.info(f"Request URL: {request.url}")
+        logger.info(f"Request headers: {dict(request.headers)}")
+        logger.info(f"Content-Type: {request.headers.get('content-type', 'Not set')}")
         
-        # If LLM detection fails or returns generic result, try fallback with file info
-        if detected_workflow in ["data_analysis", "multi_step_web_scraping"] and file_contents:
-            fallback_workflow = detect_workflow_type_fallback(task_description, detected_workflow, file_contents)
-            if fallback_workflow != detected_workflow:
-                detected_workflow = fallback_workflow
-                logger.info(f"Enhanced detection changed workflow to: {detected_workflow}")
-        logger.info(f"Detected workflow: {detected_workflow}")
-        logger.info(f"Task description: {task_description[:200]}...")
-
-        # Prepare enhanced workflow input
-        workflow_input = {
-            "task_description": task_description,
-            "questions": questions_text,
-            "additional_files": file_contents,
-            "processed_files_info": processed_files,
-            "workflow_type": detected_workflow,
-            "parameters": prepare_workflow_parameters(task_description, detected_workflow, questions_text),
-            "output_requirements": extract_output_requirements(task_description),
-        }
-
-        logger.info(f"Workflow input prepared with {len(workflow_input)} keys")
-        logger.info(f"Additional files: {list(file_contents.keys())}")
-
-        # Execute workflow synchronously (always within 3 minutes)
-        logger.info(f"Processing task {task_id} synchronously with " f"workflow: {detected_workflow}")
-
+        # Log form data if available
         try:
-            logger.info(f"Starting workflow execution for {detected_workflow}")
-            result = await asyncio.wait_for(
-                execute_workflow_sync(detected_workflow, workflow_input, task_id), timeout=180  # 3 minutes
-            )
-
-            logger.info(f"Task {task_id} completed successfully")
-            logger.info(f"Result keys: {list(result.keys()) if isinstance(result, dict) else 'Not a dict'}")
-
-            return {
-                "task_id": task_id,
-                "status": "completed",
-                "workflow_type": detected_workflow,
-                "result": result,
+            form = await request.form()
+            logger.info(f"Form keys: {list(form.keys())}")
+            for key, value in form.items():
+                if hasattr(value, 'filename'):
+                    logger.info(f"Form field '{key}': FILE - filename='{value.filename}', content_type='{getattr(value, 'content_type', 'unknown')}'")
+                else:
+                    logger.info(f"Form field '{key}': TEXT - value='{str(value)[:200]}{'...' if len(str(value)) > 200 else ''}'")
+        except Exception as e:
+            logger.warning(f"Could not parse form data: {e}")
+        
+        # Log FastAPI parsed parameters
+        logger.info(f"FastAPI questions_txt: filename='{questions_txt.filename if questions_txt else 'None'}', content_type='{questions_txt.content_type if questions_txt else 'None'}'")
+        
+        logger.info(f"=== END REQUEST DEBUG INFO ===")
+        
+        logger.info(f"Received questions_txt filename: {questions_txt.filename}")
+        # Extract additional files from form data (flexible field names)
+        form_data = await request.form()
+        additional_files_from_form = []
+        
+        logger.info(f"Extracting additional files from form data...")
+        for field_name, field_value in form_data.items():
+            if field_name != "questions.txt" and hasattr(field_value, 'filename'):
+                # This is a file field
+                logger.info(f"Found additional file: {field_value.filename}, Content-Type: {getattr(field_value, 'content_type', 'unknown')}")
+                additional_files_from_form.append(field_value)
+        
+        logger.info(f"Received {len(additional_files_from_form)} additional files: {[f.filename for f in additional_files_from_form]}")
+        
+        # Read questions.txt content
+        questions_content = await questions_txt.read()
+        logger.info(f"Processed questions.txt with {len(questions_content)} characters")
+        
+        # Save questions.txt to /tmp
+        questions_file_path = save_questions_file(questions_txt.filename, questions_content)
+        logger.info(f"Saved questions.txt to {questions_file_path}")
+        
+        # Process additional files
+        additional_files = {}
+        logger.info(f"Processing {len(additional_files_from_form)} additional files...")
+        for file in additional_files_from_form:
+            logger.info(f"Processing file: {file.filename}, Content-Type: {file.content_type}")
+            file_content = await file.read()
+            logger.info(f"Read {len(file_content)} bytes from {file.filename}")
+            
+            if file.filename.endswith('.csv'):
+                logger.info(f"Processing CSV file: {file.filename}")
+                # Save CSV file to temporary directory
+                csv_file_path = save_csv_file(file.filename, file_content)
+                additional_files[csv_file_path] = {"type": "csv", "original_name": file.filename}
+                logger.info(f"Processed CSV file: {file.filename}")
+                logger.info(f"Saved {file.filename} to {csv_file_path}")
+                
+                # Verify file was saved
+                if os.path.exists(csv_file_path):
+                    file_size = os.path.getsize(csv_file_path)
+                    logger.info(f"Verified: {csv_file_path} exists with size {file_size} bytes")
+                else:
+                    logger.error(f"Error: {csv_file_path} was not saved properly")
+            else:
+                # Save other file types to temporary directory
+                other_file_path = save_other_file(file.filename, file_content)
+                additional_files[other_file_path] = {"type": "other", "original_name": file.filename}
+        
+        # Use questions content as task description
+        task_description = questions_content.decode('utf-8')
+        logger.info(f"Using task description from questions.txt: {task_description[:200]}...")
+        
+        # Detect workflow type
+        logger.info("Starting LLM-based workflow detection...")
+        workflow_type = detect_workflow_type(task_description, additional_files)
+        logger.info(f"Detected workflow type: {workflow_type}")
+        logger.info(f"Task description length: {len(task_description)} chars")
+        logger.info(f"Available files: {list(additional_files.keys())}")
+        
+        # Prepare workflow input
+        workflow_input = prepare_workflow_input(
+            task_description=task_description,
+            questions=task_description,
+            additional_files=additional_files,
+            workflow_type=workflow_type,
+            file_content=task_description
+        )
+        logger.info(f"Workflow input prepared with {len(workflow_input)} keys")
+        logger.info(f"Additional files in workflow_input: {list(workflow_input.get('additional_files', {}).keys())}")
+        logger.info(f"Workflow parameters: {workflow_input.get('parameters', {})}")
+        
+        # Execute workflow synchronously
+        logger.info(f"Processing task {task_id} synchronously with workflow: {workflow_type}")
+        result = await execute_workflow_sync(workflow_type, workflow_input, task_id)
+        
+        # Add processing information to result
+        if isinstance(result, dict):
+            result.update({
                 "processing_info": {
                     "questions_file": questions_txt.filename,
-                    "additional_files": list(processed_files.keys()),
-                    "workflow_auto_detected": True,
-                    "processing_time": "synchronous",
-                },
-                "timestamp": datetime.now().isoformat(),
-            }
-
-        except asyncio.TimeoutError:
-            logger.error(f"Task {task_id} timed out after 3 minutes")
-            raise HTTPException(
-                status_code=408,
-                detail=("Request timed out after 3 minutes. Please simplify " "your request or try again."),
-            )
-        except Exception as e:
-            logger.error(f"Task {task_id} failed: {e}")
-            raise HTTPException(status_code=500, detail=f"Processing failed: {str(e)}")
-
-    except HTTPException:
-        raise
+                    "additional_files": [f.filename for f in additional_files_from_form],
+                    "workflow_auto_detected": workflow_type
+                }
+            })
+        
+        return result
+        
     except Exception as e:
-        logger.error(f"Error processing request: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error processing request: {str(e)}")
+        logger.error(f"Error processing task {task_id}: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "task_id": task_id,
+                "status": "error",
+                "error": str(e),
+                "workflow_type": "error"
+            }
+        )
 
 
 async def execute_workflow_sync(
@@ -519,8 +563,12 @@ async def execute_workflow_sync(
 ) -> Dict[str, Any]:  # Execute workflow synchronously
     """Execute workflow synchronously with enhanced error handling"""
     try:
+        logger.info(f"[{task_id}] Executing workflow {workflow_type}")
+        logger.info(f"[{task_id}] Workflow input keys: {list(workflow_input.keys())}")
+        logger.info(f"[{task_id}] Additional files: {list(workflow_input.get('additional_files', {}).keys())}")
+        
         if orchestrator is None:
-            logger.warning("No orchestrator available, cannot execute workflows")
+            logger.warning(f"[{task_id}] No orchestrator available, cannot execute workflows")
             return {
                 "workflow_type": workflow_type,
                 "status": "completed_fallback",
@@ -538,12 +586,12 @@ async def execute_workflow_sync(
                 "files_processed": list(workflow_input.get("additional_files", {}).keys()),
             }
         else:
-            logger.info(f"Executing workflow {workflow_type} with orchestrator")
-            logger.info(f"Available workflows: {list(orchestrator.workflows.keys())}")
+            logger.info(f"[{task_id}] Executing workflow {workflow_type} with orchestrator")
+            logger.info(f"[{task_id}] Available workflows: {list(orchestrator.workflows.keys())}")
 
             if workflow_type not in orchestrator.workflows:
                 logger.warning(
-                    f"Workflow {workflow_type} not found, available: " f"{list(orchestrator.workflows.keys())}"
+                    f"[{task_id}] Workflow {workflow_type} not found, available: {list(orchestrator.workflows.keys())}"
                 )
                 return {
                     "workflow_type": workflow_type,
@@ -552,16 +600,19 @@ async def execute_workflow_sync(
                     "available_workflows": list(orchestrator.workflows.keys()),
                 }
 
+            logger.info(f"[{task_id}] Calling orchestrator.execute_workflow...")
             result = await orchestrator.execute_workflow(workflow_type, workflow_input)
-            logger.info(f"Workflow {workflow_type} executed successfully for " f"task {task_id}")
-            logger.info(f"Result type: {type(result)}")
+            logger.info(f"[{task_id}] Workflow {workflow_type} executed successfully")
+            logger.info(f"[{task_id}] Result type: {type(result)}")
             if isinstance(result, dict):
-                logger.info(f"Result keys: {list(result.keys())}")
+                logger.info(f"[{task_id}] Result keys: {list(result.keys())}")
+                if "analysis_result" in result:
+                    logger.info(f"[{task_id}] Analysis result preview: {str(result['analysis_result'])[:200]}...")
             return result
     except Exception as e:
-        logger.error(f"Error executing workflow {workflow_type}: {e}")
-        logger.error(f"Exception type: {type(e)}")
+        logger.error(f"[{task_id}] Error executing workflow {workflow_type}: {e}")
+        logger.error(f"[{task_id}] Exception type: {type(e)}")
         import traceback
 
-        logger.error(f"Traceback: {traceback.format_exc()}")
+        logger.error(f"[{task_id}] Traceback: {traceback.format_exc()}")
         raise e

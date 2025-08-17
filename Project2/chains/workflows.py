@@ -922,9 +922,16 @@ class GenericCSVAnalysisWorkflow(BaseWorkflow):
             
             # Find CSV files in uploaded files
             csv_files = {}
-            for filename, content in additional_files.items():
-                if filename.lower().endswith('.csv') and isinstance(content, str):
-                    csv_files[filename] = content
+            for file_path, file_info in additional_files.items():
+                if file_path.lower().endswith('.csv'):
+                    # Read the file content from the file path
+                    try:
+                        with open(file_path, 'r') as f:
+                            csv_content = f.read()
+                        csv_files[file_info.get('original_name', file_path)] = csv_content
+                        logger.info(f"Read CSV file: {file_path} ({len(csv_content)} characters)")
+                    except Exception as e:
+                        logger.error(f"Failed to read CSV file {file_path}: {e}")
             
             if not csv_files:
                 return {
