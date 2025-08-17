@@ -1816,10 +1816,14 @@ class AnswerQuestionsStep:
         # Include visualization if available and requested in task
         if plot_base64 and any(
             keyword in task_description.lower()
-            for keyword in ["plot", "chart", "visualization", "base64"]
+            for keyword in ["plot", "chart", "visualization", "base64", "scatterplot", "scatter plot"]
         ):
             print("Including plot_base64 in answers as requested by task")
             answers["visualization"] = plot_base64
+            # If there is a question about a scatterplot, update its answer to include the base64 URI
+            for q in questions:
+                if "scatterplot" in q.lower() or "scatter plot" in q.lower():
+                    answers[q] = f"Scatterplot generated and returned as base64 URI: {plot_base64}"
 
         # Use LLM-based question answering for all tasks
         llm_answers = self._answer_questions_with_llm(

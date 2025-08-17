@@ -183,13 +183,13 @@
                 <li><strong>Additional files</strong> - Optional files like CSV, images, etc.</li>
                 <li><strong>Synchronous processing</strong> - All requests return results immediately</li>
             </ul>
-            <code>curl "http://localhost:8000/api/" -F "questions_txt=@questions.txt" -F "files=@data.csv"</code>
+            <code>curl "http://localhost:8000/api/" -F "questions.txt=@questions.txt" -F "files=@data.csv"</code>
         </div>
 
         <form id="uploadForm">
             <div class="form-group">
-                <label for="questions_txt">Questions File (Required)</label>
-                <input type="file" id="questions_txt" name="questions_txt" accept=".txt" required>
+                <label for="questions.txt">Questions File (Required)</label>
+                <input type="file" id="questions.txt" name="questions.txt" accept=".txt" required>
                 <small class="file-info">Required: Must be a .txt file containing your analysis questions (filename must
                     contain 'question')</small>
             </div>
@@ -209,10 +209,10 @@
             <h3>Testing with curl</h3>
             <p>You can also test the API directly with curl:</p>
             <pre><code># Multiple file upload (new API v2.0)
-curl "http://localhost:8000/api/" -F "questions_txt=@questions.txt" -F "files=@data.csv" -F "files=@image.png"
+curl "http://localhost:8000/api/" -F "questions.txt=@questions.txt" -F "files=@data.csv" -F "files=@image.png"
 
 # Single questions file only
-curl "http://localhost:8000/api/" -F "questions_txt=@questions.txt"</code></pre>
+curl "http://localhost:8000/api/" -F "questions.txt=@questions.txt"</code></pre>
         </div>
     </div>
 
@@ -224,7 +224,7 @@ curl "http://localhost:8000/api/" -F "questions_txt=@questions.txt"</code></pre>
             const formData = new FormData();
 
             // Get form fields
-            const questionsFile = document.getElementById('questions_txt').files[0];
+            const questionsFile = document.getElementById('questions.txt').files[0];
             const additionalFiles = document.getElementById('files').files;
 
             // Validate required questions file
@@ -240,7 +240,7 @@ curl "http://localhost:8000/api/" -F "questions_txt=@questions.txt"</code></pre>
             }
 
             // Add files to FormData
-            formData.append('questions_txt', questionsFile);
+            formData.append('questions.txt', questionsFile);
 
             for (let i = 0; i < additionalFiles.length; i++) {
                 formData.append('files', additionalFiles[i]);

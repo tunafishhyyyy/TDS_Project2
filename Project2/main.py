@@ -224,54 +224,40 @@ def detect_workflow_type_fallback(
 
     task_lower = task_description.lower()
 
-    # Web scraping patterns - PRIORITIZE BEFORE IMAGE ANALYSIS
-    if any(keyword in task_lower for keyword in SCRAPING_KEYWORDS):
-        # Check if it involves multiple steps
-        # (cleaning, analysis, visualization, questions)
-        if any(keyword in task_lower for keyword in MULTI_STEP_KEYWORDS):
-            return "multi_step_web_scraping"
-        else:
-            return "multi_step_web_scraping"  # Image analysis patterns
-
-    if any(keyword in task_lower for keyword in IMAGE_KEYWORDS):
-        return "image_analysis"
-
-    # Text analysis patterns
-    if any(keyword in task_lower for keyword in TEXT_KEYWORDS):
-        return "text_analysis"
-
-    # Legal/Court data patterns - map to general data analysis
-    if any(keyword in task_lower for keyword in LEGAL_KEYWORDS):
-        return "data_analysis"
-
-    # Statistical analysis patterns
-    if any(keyword in task_lower for keyword in STATS_KEYWORDS):
-        return "statistical_analysis"
+    # DuckDB/database detection (priority)
+    duckdb_keywords = ["duckdb", "parquet", "s3://", "bucket", "sql", "select count(*)", "read_parquet"]
+    if any(keyword in task_lower for keyword in duckdb_keywords):
+        return "database_analysis"
 
     # Database analysis patterns
     if any(keyword in task_lower for keyword in DB_KEYWORDS):
         return "database_analysis"
 
-    # Data visualization patterns
+    # Web scraping patterns
+    if any(keyword in task_lower for keyword in SCRAPING_KEYWORDS):
+        if any(keyword in task_lower for keyword in MULTI_STEP_KEYWORDS):
+            return "multi_step_web_scraping"
+        else:
+            return "multi_step_web_scraping"
+
+    if any(keyword in task_lower for keyword in IMAGE_KEYWORDS):
+        return "image_analysis"
+    if any(keyword in task_lower for keyword in TEXT_KEYWORDS):
+        return "text_analysis"
+    if any(keyword in task_lower for keyword in LEGAL_KEYWORDS):
+        return "data_analysis"
+    if any(keyword in task_lower for keyword in STATS_KEYWORDS):
+        return "statistical_analysis"
     if any(keyword in task_lower for keyword in VIZ_KEYWORDS):
         return "data_visualization"
-
-    # Exploratory data analysis patterns
     if any(keyword in task_lower for keyword in EDA_KEYWORDS):
         return "exploratory_data_analysis"
-
-    # Predictive modeling patterns
     if any(keyword in task_lower for keyword in ML_KEYWORDS):
         return "predictive_modeling"
-
-    # Code generation patterns
     if any(keyword in task_lower for keyword in CODE_KEYWORDS):
         return "code_generation"
-
-    # Generic web scraping patterns
     if any(keyword in task_lower for keyword in WEB_KEYWORDS):
         return "multi_step_web_scraping"
-
     return default_workflow
 
 
