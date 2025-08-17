@@ -952,8 +952,8 @@ class GenericCSVAnalysisWorkflow(BaseWorkflow):
             # Parse questions and perform analysis
             analysis_result = await self._perform_generic_analysis(df, task_description, questions)
             
-            return {
-                "result": analysis_result,
+            # For CSV analysis, return metrics at top level with metadata
+            response = {
                 "workflow_type": "csv_analysis",
                 "status": "completed",
                 "csv_file_analyzed": csv_filename,
@@ -961,6 +961,11 @@ class GenericCSVAnalysisWorkflow(BaseWorkflow):
                 "columns": list(df.columns),
                 "timestamp": datetime.now().isoformat(),
             }
+            
+            # Add analysis results directly to top level
+            response.update(analysis_result)
+            
+            return response
             
         except Exception as e:
             logger.error(f"Error in GenericCSVAnalysisWorkflow: {e}")
@@ -1551,7 +1556,7 @@ class NetworkAnalysisWorkflow(BaseWorkflow):
             # Convert to base64 with lower DPI to reduce file size
             buffer = io.BytesIO()
             plt.savefig(buffer, format='png', dpi=72, bbox_inches='tight', 
-                       optimize=True, facecolor='white')
+                       facecolor='white')
             buffer.seek(0)
             image_base64 = base64.b64encode(buffer.getvalue()).decode()
             plt.close()
@@ -1605,7 +1610,7 @@ class NetworkAnalysisWorkflow(BaseWorkflow):
         # Convert to base64 with lower DPI to reduce file size
         buffer = io.BytesIO()
         plt.savefig(buffer, format='png', dpi=72, bbox_inches='tight', 
-                   optimize=True, facecolor='white')
+                   facecolor='white')
         buffer.seek(0)
         image_base64 = base64.b64encode(buffer.getvalue()).decode()
         plt.close()
@@ -1641,7 +1646,7 @@ class NetworkAnalysisWorkflow(BaseWorkflow):
         # Convert to base64 with lower DPI to reduce file size
         buffer = io.BytesIO()
         plt.savefig(buffer, format='png', dpi=72, bbox_inches='tight', 
-                   optimize=True, facecolor='white')
+                   facecolor='white')
         buffer.seek(0)
         image_base64 = base64.b64encode(buffer.getvalue()).decode()
         plt.close()
