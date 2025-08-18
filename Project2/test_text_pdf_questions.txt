@@ -1,0 +1,12 @@
+Questions for text-only PDF analysis:
+
+1. What is the total sales amount?
+2. Which region performed best?
+3. What is the growth rate?
+4. How many customers are there?
+
+Expected data format:
+- `total_sales`: number
+- `best_region`: string  
+- `growth_rate`: number
+- `customer_count`: number

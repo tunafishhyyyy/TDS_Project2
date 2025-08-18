@@ -1,0 +1,14 @@
+Questions for sales chart image analysis:
+
+1. Which product has the highest sales?
+2. What is the total sales across all products?
+3. What is the average sales per product?
+4. Which product has the lowest sales?
+5. What is the sales difference between the best and worst performing products?
+
+Expected data format:
+- `highest_sales_product`: string
+- `total_sales`: number
+- `average_sales`: number
+- `lowest_sales_product`: string
+- `sales_difference`: number

@@ -33,3 +33,7 @@ tiktoken
 faiss-cpu
 chromadb
 jinja2
+PyPDF2
+tabula-py
+pytesseract
+opencv-python

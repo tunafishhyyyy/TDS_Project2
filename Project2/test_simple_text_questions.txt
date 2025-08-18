@@ -1,0 +1,14 @@
+Questions for simple text image analysis:
+
+1. What is the total sales amount?
+2. Which product has the highest sales?
+3. What are the sales for Product B?
+4. How many products are listed?
+5. What is the difference between the highest and lowest product sales?
+
+Expected data format:
+- `total_sales`: number
+- `highest_product`: string
+- `product_b_sales`: number
+- `product_count`: number
+- `sales_difference`: number

@@ -37,6 +37,22 @@ try:
 except Exception:
     PIL_AVAILABLE = False
 
+# Optional PDF processing
+try:
+    import PyPDF2
+    import tabula
+    PDF_AVAILABLE = True
+except Exception:
+    PDF_AVAILABLE = False
+
+# Optional OCR processing for images
+try:
+    import pytesseract
+    import cv2
+    OCR_AVAILABLE = True
+except Exception:
+    OCR_AVAILABLE = False
+
 # LangChain / LLM imports (keep as you used)
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -659,14 +675,106 @@ async def analyze_data(request: Request):
                     df = pd.DataFrame(json.loads(content.decode("utf-8")))
             elif filename.endswith(".png") or filename.endswith(".jpg") or filename.endswith(".jpeg"):
                 try:
-                    if PIL_AVAILABLE:
-                        image = Image.open(BytesIO(content))
-                        image = image.convert("RGB")  # ensure RGB format
-                        df = pd.DataFrame({"image": [image]})
-                    else:
+                    if not PIL_AVAILABLE:
                         raise HTTPException(400, "PIL not available for image processing")
+                    
+                    image = Image.open(BytesIO(content))
+                    image = image.convert("RGB")  # ensure RGB format
+                    
+                    # Try OCR text extraction if available
+                    if OCR_AVAILABLE:
+                        try:
+                            # Extract text using OCR
+                            extracted_text = pytesseract.image_to_string(image)
+                            
+                            # Try to extract structured data from text
+                            lines = [line.strip() for line in extracted_text.split('\n') if line.strip()]
+                            
+                            if lines:
+                                # Try to detect if it's tabular data
+                                potential_table_data = []
+                                for line in lines:
+                                    # Split by common delimiters
+                                    if '|' in line or '\t' in line or '  ' in line:
+                                        # Looks like tabular data
+                                        if '|' in line:
+                                            row = [cell.strip() for cell in line.split('|') if cell.strip()]
+                                        elif '\t' in line:
+                                            row = [cell.strip() for cell in line.split('\t') if cell.strip()]
+                                        else:
+                                            # Split by multiple spaces
+                                            row = [cell.strip() for cell in line.split('  ') if cell.strip()]
+                                        
+                                        if len(row) > 1:
+                                            potential_table_data.append(row)
+                                
+                                if potential_table_data and len(potential_table_data) > 1:
+                                    # Create DataFrame from extracted table data
+                                    headers = potential_table_data[0]
+                                    data_rows = potential_table_data[1:]
+                                    
+                                    # Ensure all rows have same length as headers
+                                    max_cols = len(headers)
+                                    cleaned_rows = []
+                                    for row in data_rows:
+                                        if len(row) <= max_cols:
+                                            # Pad short rows with empty strings
+                                            row.extend([''] * (max_cols - len(row)))
+                                            cleaned_rows.append(row[:max_cols])
+                                    
+                                    if cleaned_rows:
+                                        df = pd.DataFrame(cleaned_rows, columns=headers)
+                                    else:
+                                        df = pd.DataFrame({"extracted_text": lines})
+                                else:
+                                    # Create DataFrame with extracted text
+                                    df = pd.DataFrame({"extracted_text": lines})
+                            else:
+                                # Fallback to image object if no text extracted
+                                df = pd.DataFrame({"image": [image], "extracted_text": ["No text detected"]})
+                                
+                        except Exception as ocr_error:
+                            # OCR failed, fallback to image storage
+                            df = pd.DataFrame({"image": [image], "ocr_error": [str(ocr_error)]})
+                    else:
+                        # No OCR available, store image object
+                        df = pd.DataFrame({"image": [image]})
+                        
                 except Exception as e:
-                    raise HTTPException(400, f"Image processing failed: {str(e)}")  
+                    raise HTTPException(400, f"Image processing failed: {str(e)}")
+            elif filename.endswith(".pdf"):
+                try:
+                    if not PDF_AVAILABLE:
+                        raise HTTPException(400, "PDF processing libraries not available. Please install PyPDF2 and tabula-py.")
+                    
+                    # Save PDF content to temporary file (tabula requires file path)
+                    temp_pdf = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
+                    temp_pdf.write(content)
+                    temp_pdf.close()
+                    
+                    try:
+                        # Try to extract tables using tabula-py (most popular for tabular data)
+                        tables = tabula.read_pdf(temp_pdf.name, pages='all', multiple_tables=True)
+                        
+                        if tables and len(tables) > 0:
+                            # Use the largest table (most likely to contain the main data)
+                            df = max(tables, key=lambda x: x.shape[0] * x.shape[1])
+                            # Clean column names
+                            df.columns = df.columns.astype(str).str.strip()
+                        else:
+                            # Fallback: extract text and create simple DataFrame
+                            with open(temp_pdf.name, 'rb') as pdf_file:
+                                reader = PyPDF2.PdfReader(pdf_file)
+                                text = ""
+                                for page in reader.pages:
+                                    text += page.extract_text() + "\n"
+                            df = pd.DataFrame({"text": [text]})
+                    finally:
+                        # Clean up temporary file
+                        os.unlink(temp_pdf.name)
+                        
+                except Exception as e:
+                    raise HTTPException(400, f"PDF processing failed: {str(e)}")  
             else:
                 raise HTTPException(400, f"Unsupported data file type: {filename}")
 

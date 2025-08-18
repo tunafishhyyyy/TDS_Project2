@@ -1,0 +1,16 @@
+Questions for mixed content image analysis:
+
+1. What is the total revenue mentioned in the summary?
+2. Which quarter had the best performance?
+3. What is the growth rate?
+4. What is the average revenue per quarter?
+5. What is the status mentioned in the summary?
+6. How much revenue did Q2 generate?
+
+Expected data format:
+- `total_revenue`: number
+- `best_quarter`: string
+- `growth_rate`: number
+- `average_quarterly_revenue`: number
+- `status`: string
+- `q2_revenue`: number

@@ -1,0 +1,14 @@
+Questions for correlation plot image analysis:
+
+1. What is the correlation coefficient shown in the plot?
+2. What does the correlation suggest about the relationship between study hours and test scores?
+3. What is the approximate slope of the regression line?
+4. Is the correlation positive or negative?
+5. How strong is the correlation (weak, moderate, or strong)?
+
+Expected data format:
+- `correlation_coefficient`: number
+- `relationship_interpretation`: string
+- `regression_slope`: number
+- `correlation_direction`: string
+- `correlation_strength`: string

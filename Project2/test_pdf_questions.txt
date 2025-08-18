@@ -1,0 +1,12 @@
+Test questions for PDF analysis:
+
+1. What is the total salary of all employees?
+2. Who has the highest salary?
+3. What is the average age of employees?
+4. Create a bar chart showing salary by name.
+
+Expected data format:
+- `total_salary`: number
+- `highest_paid_employee`: string
+- `average_age`: number
+- `salary_chart`: string

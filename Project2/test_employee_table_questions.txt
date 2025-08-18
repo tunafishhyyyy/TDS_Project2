@@ -1,0 +1,14 @@
+Questions for employee table image analysis:
+
+1. How many employees are listed in the table?
+2. What is the average salary across all employees?
+3. Which department has the most employees?
+4. Who has the highest salary and what is it?
+5. What is the total years of experience across all employees?
+
+Expected data format:
+- `employee_count`: number
+- `average_salary`: number
+- `most_common_department`: string
+- `highest_paid_employee`: string
+- `total_experience_years`: number
