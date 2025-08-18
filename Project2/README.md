@@ -1,6 +1,26 @@
-# Multi-Modal Data Analysis API v2.0
+# TDS Data Analysis API - Advanced Multi-Modal Intelligence Platform
 
-A FastAPI-based REST API that uses LangChain to orchestrate LLM workflows for comprehensive data analysis tasks with multi-modal support.
+A FastAPI-based REST API that uses LangChain to orchestrate sophisticated LLM workflows for comprehensive data analysis tasks with multi-modal support.
+
+## 🏗️ System Architecture
+
+The TDS Data Analysis API is built on a modern, scalable architecture:
+
+- **Agent-Orchestrated Intelligence**: LangChain-powered agents route tasks to specialized workflows
+- **Multi-Modal Processing**: Unified handling of text, images, PDFs, CSV, and web data  
+- **Fault-Tolerant LLM Management**: Automatic failover across multiple API keys and models
+- **Sandboxed Execution**: Secure Python environment with resource constraints and timeout protection
+- **Real-Time Analytics**: Synchronous processing with comprehensive result formatting
+- **Enterprise Monitoring**: Advanced diagnostics, health checks, and performance metrics
+
+### Core Components
+
+- **`chains/main_app.py`**: Main FastAPI application with LLM orchestration
+- **`chains/workflows.py`**: 12+ specialized analysis workflows
+- **`chains/web_scraping_steps.py`**: Modular 6-step web scraping pipeline
+- **`chains/base.py`**: Abstract workflow classes and LangChain integration
+- **`config.py`**: Environment and model configuration management
+- **`utils/`**: Enhanced utilities for LLM management and image optimization
 
 ## 🚀 New Features (v2.0)
 
@@ -325,7 +345,9 @@ GET /summary  # Enhanced diagnostics
 ./server_8001.sh status
 
 # Direct execution
-python chains/temp.py
+python chains/main_app.py
+# Or using the launcher script
+python run_main_server.py
 ```
 
 ### Standard Server (Port 8000)
@@ -335,6 +357,15 @@ bash run_docker.sh
 
 # Local development
 uvicorn main:app --reload
+```
+
+### Docker Deployment
+```bash
+# Enhanced system with main_app.py
+bash run_main_docker.sh
+
+# Standard system
+bash run_docker.sh
 ```
 
 ## VM Setup & Installation (Linux)

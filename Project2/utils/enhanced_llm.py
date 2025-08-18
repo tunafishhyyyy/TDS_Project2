@@ -1,5 +1,5 @@
 """
-Enhanced LLM system with fallback - extracted from temp.py
+Enhanced LLM system with fallback - extracted from main_app.py
 Integrates with existing workflow system
 """
 

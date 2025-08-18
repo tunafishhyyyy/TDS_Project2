@@ -44,7 +44,7 @@ LLM_TIMEOUT_SECONDS=240
 
 ## 🆚 **System Comparison**
 
-| Feature | Current System | Enhanced System (temp.py) |
+| Feature | Current System | Enhanced System (main_app.py) |
 |---------|---------------|---------------------------|
 | **Architecture** | Workflow-based orchestration | Agent-based with tools |
 | **LLM Reliability** | Single API key | Multi-key fallback |

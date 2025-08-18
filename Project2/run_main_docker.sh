@@ -19,7 +19,7 @@ docker run -d \
   -p 8001:8001 \
   -e PORT=8001 \
   main-analysis-api \
-  python run_temp_server.py
+  python run_main_server.py
 
 echo "✅ TDS Data Analysis API running at http://localhost:8001"
 echo "📊 Multi-modal analysis system ready"

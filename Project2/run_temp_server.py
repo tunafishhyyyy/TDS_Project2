@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Run the temp.py system on port 8001 for comparison with main system
+Run the enhanced main_app.py system on port 8001 for the TDS Data Analysis API
 """
 import os
 import sys
@@ -10,12 +10,12 @@ import uvicorn
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 if __name__ == "__main__":
-    # Import the app from temp.py
-    from chains.temp import app
+    # Import the app from main_app.py
+    from chains.main_app import app
     
-    print("🚀 Starting enhanced data analysis system on port 8001...")
-    print("📊 Main system still running on port 8000")
-    print("🔧 Enhanced features: Multi-LLM fallback, better diagnostics, image optimization")
+    print("🚀 Starting TDS Data Analysis API on port 8001...")
+    print("📊 Enhanced multi-modal analysis system")
+    print("🔧 Features: LLM orchestration, web scraping, image processing, PDF analysis")
     
     uvicorn.run(
         app,

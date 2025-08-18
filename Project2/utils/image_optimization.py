@@ -1,5 +1,5 @@
 """
-Enhanced image optimization utilities extracted from temp.py
+Enhanced image optimization utilities extracted from main_app.py
 """
 
 import base64

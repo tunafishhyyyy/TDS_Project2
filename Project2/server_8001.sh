@@ -1,8 +1,8 @@
 #!/bin/bash
 # Usage: ./server_8001.sh start|stop|status
 
-SERVER_CMD="python chains/temp.py"
-LOG_FILE="temp_server.log"
+SERVER_CMD="/work/tanmay/TDS/TDS_Project2/Project2/.venv/bin/python chains/main_app.py"
+LOG_FILE="main_app_server.log"
 PID_FILE="server_8001.pid"
 PORT=8001
 
