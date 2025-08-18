@@ -615,6 +615,7 @@ def convert_to_evaluation_format(result: Dict, raw_questions: str) -> Dict:
 
 
 @app.post("/api")
+@app.post("/api/")
 async def analyze_data(request: Request):
     try:
         form = await request.form()
