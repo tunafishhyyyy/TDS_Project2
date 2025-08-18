@@ -2,6 +2,28 @@
 
 A FastAPI-based REST API that uses LangChain to orchestrate sophisticated LLM workflows for comprehensive data analysis tasks with multi-modal support.
 
+## 🚨 **IMPORTANT - BRANCH INFORMATION** 🚨
+
+> **⚠️ CRITICAL NOTICE**: 
+> 
+> **🔄 WORKING BRANCH HAS THE LATEST CODE**
+> 
+> - **`working` branch**: ✅ **LATEST CODE** - Contains the enhanced `main_app.py` system and all improvements
+> - **`main` branch**: ❌ **DEPRECATED CODE** - Contains the old `main.py` system with known issues
+> 
+> **🔧 TO GET THE LATEST FEATURES:**
+> ```bash
+> git clone https://github.com/tunafishhyyyy/TDS_Project2.git
+> cd TDS_Project2
+> git checkout working  # SWITCH TO WORKING BRANCH
+> ```
+> 
+> **📍 Always use the `working` branch for:**
+> - New deployments and installations
+> - Testing and development
+> - Production environments
+> - Latest bug fixes and features
+
 ## 🏗️ System Architecture
 
 The TDS Data Analysis API is built on a modern, scalable architecture:
@@ -24,9 +46,13 @@ The TDS Data Analysis API is built on a modern, scalable architecture:
 
 ## 📜 Old Approach (Deprecated)
 
-### Legacy System (`main.py`)
+### Legacy System (`main.py`) - Located in `main` branch ❌
 
-The original TDS Data Analysis API was built using a complex LangChain workflow orchestration system centered around `main.py`. This approach had several architectural limitations that led to its deprecation:
+The original TDS Data Analysis API was built using a complex LangChain workflow orchestration system centered around `main.py`. **This legacy code is now located in the `main` branch and should not be used for new deployments.**
+
+**🚨 Branch Structure:**
+- **`main` branch**: Contains the deprecated `main.py` system
+- **`working` branch**: Contains the current `main_app.py` system ✅
 
 #### Issues with the Old Approach:
 
@@ -73,7 +99,10 @@ The new approach addresses these limitations through:
 - **Maintenance**: 60% reduction in codebase complexity
 - **Extensibility**: New analysis types require no code changes
 
-The old `main.py` system remains in the codebase for reference but is no longer actively used. All new development and production deployments use the enhanced `main_app.py` system.
+**📍 Current Status:**
+- The old `main.py` system is preserved in the `main` branch for reference
+- All active development happens in the `working` branch with `main_app.py`
+- **Production deployments should always use the `working` branch**
 
 ## 🚀 New Features (v2.0)
 
@@ -488,23 +517,39 @@ sudo systemctl start docker
 sudo usermod -aG docker $USER
 # You may need to log out and log back in for group changes to take effect
 
-# Clone the public repository
+# Clone the repository and switch to working branch
 git clone https://github.com/tunafishhyyyy/TDS_Project2.git
 cd TDS_Project2/Project2
 
+# 🚨 CRITICAL: Switch to working branch for latest code
+git checkout working
+
 # Copy and edit environment variables
 cp .env.template .env
-vim .env  # Add your OpenAI API key and other secrets
+vim .env  # Add your Gemini API keys and other secrets
 
-# Build and run the Docker container
-bash run_docker.sh
+# Use the enhanced system (main_app.py)
+# Start the enhanced server
+./server_8001.sh start
 
-# The API will be available at http://localhost:8000/
+# The enhanced API will be available at http://localhost:8001/
 ```
+
+**⚠️ Important Notes:**
+- **Always use `git checkout working`** to get the latest enhanced system
+- The `main` branch contains deprecated code that may not work properly
+- Use port 8001 for the enhanced system, not port 8000
 
 ## Quick Start
 
 **⚠️ IMPORTANT**: This project has two systems. Use the **Enhanced System** (main_app.py) for all new deployments. The legacy system (main.py) is deprecated.
+
+**🔄 FIRST STEP - GET THE LATEST CODE:**
+```bash
+git clone https://github.com/tunafishhyyyy/TDS_Project2.git
+cd TDS_Project2/Project2
+git checkout working  # ESSENTIAL: Switch to working branch
+```
 
 ### Enhanced System (Recommended)
 
