@@ -887,25 +887,28 @@ class ScrapeTableStep:
                 if diversity_score / min(table.shape[0], 10) < 0.3:  # Less than 30% diversity
                     score -= 10  # Penalty for repetitive content
             
-            # Special handling for revenue/financial data
-            if keywords and any(word in ['gross', 'revenue', 'billion', 'money'] for word in keywords):
-                # Check for clean numeric data patterns in gross/revenue columns
-                gross_cols = [col for col in table.columns if 'gross' in str(col).lower()]
-                if gross_cols:
-                    sample_values = table[gross_cols[0]].astype(str).head(5).tolist()
+            # Dynamic data type detection for financial/revenue data
+            if keywords and any(word in ['gross', 'revenue', 'financial', 'money', 'billion', 'sales'] for word in keywords):
+                # Check for clean numeric data patterns in financial columns
+                financial_cols = [col for col in table.columns 
+                                if any(fin_word in str(col).lower() 
+                                      for fin_word in ['gross', 'revenue', 'sales', 'amount', 'value', 'price'])]
+                
+                if financial_cols:
+                    sample_values = table[financial_cols[0]].astype(str).head(5).tolist()
                     # Prefer tables with clean numeric formats like "$2,923,706,026"
                     clean_format_count = sum(1 for val in sample_values 
-                                           if re.match(r'^\$[\d,]+$', str(val)))
+                                           if re.match(r'^\$?[\d,]+(?:\.\d+)?$', str(val)))
                     if clean_format_count >= 3:  # At least 3 clean format values
-                        print(f"Table {i} has clean revenue format, boosting score")
-                        score += 20  # Significant bonus for clean revenue data
+                        print(f"Table {i} has clean financial format, boosting score")
+                        score += 20  # Significant bonus for clean financial data
                     
                     # Penalize tables with complex/messy formats
                     messy_format_count = sum(1 for val in sample_values 
                                            if ('–' in str(val) or '(' in str(val) or 'R' in str(val)))
                     if messy_format_count >= 2:
-                        print(f"Table {i} has messy revenue format, reducing score")
-                        score -= 15  # Penalty for messy revenue data
+                        print(f"Table {i} has messy financial format, reducing score")
+                        score -= 15  # Penalty for messy financial data
             
             candidate_tables.append((i, table, score))
         
@@ -1044,8 +1047,14 @@ class CleanDataStep:
         print("\n=== CLEANING DATA ===")
         print(f"Original data types:\n{data.dtypes}")
 
-        # Define columns that should NOT be converted to numeric
-        text_columns = ['Title', 'Ref']  # Movie titles and references should stay as text
+        # Define columns that should NOT be converted to numeric (dynamic detection)
+        text_columns = []
+        for col in data.columns:
+            col_lower = str(col).lower()
+            # Dynamic detection of text-only columns
+            if any(text_indicator in col_lower for text_indicator in 
+                   ['title', 'name', 'ref', 'description', 'label', 'category', 'type']):
+                text_columns.append(col)
         
         # Clean each column
         task_description = input_data.get("task_description", "")
@@ -1080,11 +1089,12 @@ class CleanDataStep:
                 # Convert to numeric
                 numeric_data = pd.to_numeric(cleaned, errors="coerce")
                 
-                # Additional outlier filtering for financial data
-                if 'gross' in col.lower() or 'revenue' in col.lower() or 'box' in col.lower():
-                    # Cap at a reasonable maximum for movie revenues (e.g., 50B)
-                    numeric_data = numeric_data.where(numeric_data <= 50_000_000_000, np.nan)
-                    print(f"  Applied movie revenue outlier filtering for {col}")
+                # Dynamic outlier filtering based on data domain
+                if any(domain_word in col.lower() for domain_word in ['gross', 'revenue', 'box', 'sales']):
+                    # Determine reasonable maximum based on data scale
+                    max_reasonable = self._determine_outlier_threshold(numeric_data, col)
+                    numeric_data = numeric_data.where(numeric_data <= max_reasonable, np.nan)
+                    print(f"  Applied dynamic outlier filtering for {col} (max: {max_reasonable:,})")
 
                 # Only replace if we got some valid numbers (at least 5% of data should be numeric)
                 valid_count = numeric_data.notna().sum()
@@ -1117,6 +1127,39 @@ class CleanDataStep:
         data = data.replace([np.inf, -np.inf], np.nan)
         data = data.where(pd.notnull(data), None)
         return sanitize_for_json({"data": data, "numeric_cols": numeric_cols})
+    
+    def _determine_outlier_threshold(self, data_series, column_name):
+        """Dynamically determine reasonable outlier threshold based on data characteristics"""
+        if data_series.empty or data_series.isna().all():
+            return float('inf')
+        
+        # Calculate basic statistics
+        median_val = data_series.median()
+        q75 = data_series.quantile(0.75)
+        q95 = data_series.quantile(0.95)
+        max_val = data_series.max()
+        
+        # Domain-specific thresholds
+        col_lower = column_name.lower()
+        
+        if any(word in col_lower for word in ['revenue', 'gross', 'box']):
+            # For revenue data: use 95th percentile * 5 or reasonable industry maximum
+            if 'movie' in col_lower or 'film' in col_lower:
+                return min(q95 * 5, 50_000_000_000)  # $50B max for movies
+            else:
+                return min(q95 * 10, 1_000_000_000_000)  # $1T max for companies
+                
+        elif any(word in col_lower for word in ['sales', 'amount', 'value']):
+            # For sales/amounts: use IQR method with generous multiplier
+            return q75 + (q75 - median_val) * 10
+            
+        elif any(word in col_lower for word in ['population', 'count']):
+            # For population/count data: use 99th percentile
+            return data_series.quantile(0.99) * 2
+            
+        else:
+            # Generic: use 95th percentile with safety margin
+            return q95 * 3
 
 
 class AnalyzeDataStep:

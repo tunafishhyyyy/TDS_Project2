@@ -260,6 +260,16 @@ def detect_workflow_type_fallback(
             if analysis_keyword_match:
                 logger.info("Detected CSV analysis workflow")
                 return "csv_analysis"
+    
+    # Check for web scraping keywords
+    web_scraping_keywords = ['scrape', 'extract', 'wikipedia', 'website', 'url', 'http', 'web', 'crawl', 'parse']
+    if any(keyword in task_lower for keyword in web_scraping_keywords):
+        logger.info("Detected web scraping workflow")
+        return "multi_step_web_scraping"
+    
+    # Default fallback
+    logger.info(f"No specific workflow detected, using default: {default_workflow}")
+    return default_workflow
 
 
 def prepare_workflow_parameters(

@@ -297,8 +297,14 @@ DATABASE_DETECTION_KEYWORDS = ["duckdb", "sql", "database"]
 CHART_TYPE_KEYWORDS = ["scatterplot", "scatter"]
 REGRESSION_KEYWORDS = ["regression"]
 BASE64_KEYWORDS = ["base64", "data uri"]
-CSV_ANALYSIS_KEYWORDS = ["sales", "csv", "analyze", "total", "median", "correlation", "tax", "region", "cumulative"]
-NETWORK_ANALYSIS_KEYWORDS = ["network", "edge", "node", "graph", "degree", "shortest path", "density", "Alice", "Eve", "edges.csv"]
+CSV_ANALYSIS_KEYWORDS = [
+    "csv", "analyze", "total", "median", "correlation", "tax", "cumulative",
+    "summary", "statistics", "aggregate", "group"
+]
+NETWORK_ANALYSIS_KEYWORDS = [
+    "network", "edge", "node", "graph", "degree", "shortest path",
+    "density", "clustering", "edges.csv"
+]
 
 # ===== DATA ANALYSIS CONSTANTS =====
 

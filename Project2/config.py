@@ -11,14 +11,34 @@ TIMEOUT = 180  # seconds
 # LangChain Configuration
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")  # Added for Gemini
+
+# Enhanced LLM Configuration - Multiple Gemini keys for fallback
+GEMINI_KEYS = [os.getenv(f"gemini_api_{i}") for i in range(1, 11)]
+GEMINI_KEYS = [k for k in GEMINI_KEYS if k] or [GEMINI_API_KEY]
+
 LANGCHAIN_TRACING_V2 = os.getenv("LANGCHAIN_TRACING_V2", "false")
 LANGCHAIN_API_KEY = os.getenv("LANGCHAIN_API_KEY")
 
-# Model Configuration
+# Model Configuration with hierarchy
 DEFAULT_OPENAI_MODEL = "gpt-4"  # Upgraded to GPT-4 for better accuracy
 DEFAULT_GEMINI_MODEL = "gemini-pro"
+
+# Enhanced model hierarchy for fallback
+GEMINI_MODEL_HIERARCHY = [
+    "gemini-2.5-pro",
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite", 
+    "gemini-2.0-flash",
+    "gemini-2.0-flash-lite"
+]
+
 TEMPERATURE = 0.3  # Lower temperature for more accurate analysis
 MAX_TOKENS = 4000
+
+# Enhanced reliability settings
+USE_ENHANCED_LLM = os.getenv("USE_ENHANCED_LLM", "true").lower() == "true"
+LLM_MAX_RETRIES = int(os.getenv("LLM_MAX_RETRIES", "3"))
+LLM_TIMEOUT_SECONDS = int(os.getenv("LLM_TIMEOUT_SECONDS", "240"))
 
 # Vector Store Configuration
 VECTOR_STORE_TYPE = "chromadb"  # Options: chromadb, faiss
